@@ -74,6 +74,24 @@ The app will be available at `http://localhost:3000`.
 
 ## 🧠 Under the Hood
 
+### System Architecture
+```mermaid
+graph TD
+    A[User Input] --> B[React Frontend]
+    B --> C{Gemini 3.1 Pro API}
+    C -->|System Instruction| D[Reasoning Engine]
+    D --> E[Relevance Check]
+    E -->|Relevant| F[Generate Overview, Hints & Solution]
+    E -->|Irrelevant| G[Return Rejection Message]
+    F --> H[Structured JSON Response]
+    G --> H
+    H --> I[React State Management]
+    I --> J[Progressive UI Revelation]
+    J --> K[User Interaction]
+    K -->|Reveal Hint| J
+    K -->|Reveal Solution| L[Code Editor View]
+```
+
 ### Socratic Prompting Strategy
 HintFlow uses a specialized **System Instruction** to guide the Gemini 3.1 Pro model. Instead of a standard chat interface, the model is instructed to act as a "Socratic Tutor." It follows a strict multi-step reasoning process:
 1. **Relevance Check**: The model first evaluates if the input is a programming problem.
