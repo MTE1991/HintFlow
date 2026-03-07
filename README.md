@@ -1,20 +1,78 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# HintFlow 🚀
 
-# Run and deploy your AI Studio app
+**HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
-This contains everything you need to run your app locally.
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
 
-View your app in AI Studio: https://ai.studio/apps/4c6d97e4-6d5d-49b2-9c80-f8290c7b495c
+## ✨ Features
 
-## Run Locally
+- **Socratic Tutoring**: Provides high-level overviews and conceptual nudges before showing code.
+- **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to implementation details.
+- **Python-Focused**: All solutions and hints are tailored for Python, the ideal language for beginners.
+- **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting and line numbers.
+- **Terminal Aesthetic**: A clean, dark-themed UI inspired by classic developer environments.
+- **No Spoilers**: Solutions are hidden behind a "Reveal" button to prevent accidental spoilers.
 
-**Prerequisites:**  Node.js
+## 🛠️ Tech Stack
 
+- **Frontend**: React 19, TypeScript, Vite
+- **AI Engine**: Google Gemini 3.0 Flash (via `@google/genai`)
+- **Styling**: Tailwind CSS 4
+- **Animations**: Motion (formerly Framer Motion)
+- **Icons**: Lucide React
+- **Syntax Highlighting**: React Syntax Highlighter (Prism)
+- **Markdown**: React Markdown
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [npm](https://www.npmjs.com/) (v9 or higher)
+- A Google Gemini API Key (Get one for free at [Google AI Studio](https://aistudio.google.com/))
+
+### Installation
+
+1. **Clone or download** the repository to your local machine.
+2. **Navigate** to the project directory:
+   ```bash
+   cd HintFlow
+   ```
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+### Configuration
+
+1. Create a `.env` file in the root directory:
+   ```bash
+   touch .env
+   ```
+2. Add your Gemini API key to the `.env` file:
+   ```env
+   GEMINI_API_KEY=your_api_key_here
+   ```
+
+### Running the App
+
+Start the development server:
+```bash
+npm run dev
+```
+The app will be available at `http://localhost:3000`.
+
+## 📖 How to Use
+
+1. **Enter a Problem**: Paste a coding problem statement (e.g., "Write a function to check if a number is prime").
+2. **Read the Overview**: HintFlow will provide a conceptual explanation of the problem.
+3. **Reveal Hints**: Click "Reveal Next Hint" to get progressive clues about the logic and syntax.
+4. **Solve It**: Try to write the code yourself based on the hints!
+5. **Check the Solution**: If you're stuck or want to compare your work, click "Reveal Full Solution" to see the Python implementation and a detailed explanation.
+
+## 📜 License
+
+This project is licensed under the **Apache-2.0 License**. See the source files for more details.
+
+---
+*Built for the next generation of software engineers.*
