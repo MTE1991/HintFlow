@@ -72,6 +72,34 @@ The app will be available at `http://localhost:3000`.
 4. **Solve It**: Try to write the code yourself based on the hints!
 5. **Check the Solution**: If you're stuck or want to compare your work, click "Reveal Full Solution" to see the Python implementation and a detailed explanation.
 
+## 🧠 Under the Hood
+
+### Socratic Prompting Strategy
+HintFlow uses a specialized **System Instruction** to guide the Gemini 3.1 Pro model. Instead of a standard chat interface, the model is instructed to act as a "Socratic Tutor." It follows a strict multi-step reasoning process:
+1. **Relevance Check**: The model first evaluates if the input is a programming problem.
+2. **Conceptual Overview**: It identifies the core CS concepts involved (e.g., recursion, data structures).
+3. **Hint Generation**: It creates 3-4 hints that progressively move from abstract logic to specific implementation details.
+4. **Solution Guarding**: It provides a full, well-formatted Python solution and a deep-dive explanation.
+
+### Structured Data Flow
+To ensure the UI remains consistent, HintFlow leverages **JSON Schema** enforcement. The Gemini API returns a structured object:
+```json
+{
+  "isRelevant": boolean,
+  "overview": "string",
+  "hints": ["string", "string", "string"],
+  "solution": "string",
+  "explanation": "string"
+}
+```
+This allows the React frontend to parse the response reliably and manage the state of hidden/revealed content.
+
+### Progressive Revelation Logic
+The frontend manages the "Hint State" using React hooks. Hints are stored in an array but only rendered based on a `visibleHintsCount` state. This ensures that users aren't overwhelmed and are encouraged to think through each step before moving to the next.
+
+### Professional Code Rendering
+For the solution view, HintFlow integrates `react-syntax-highlighter` with the **Prism** engine. It uses the `vscDarkPlus` theme and custom CSS to simulate a real-world IDE experience, complete with line numbers and optimized line heights.
+
 ## 📜 License
 
 This project is licensed under the **Apache-2.0 License**. See the source files for more details.
