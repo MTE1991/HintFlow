@@ -76,20 +76,46 @@ The app will be available at `http://localhost:3000`.
 
 ### System Architecture
 ```mermaid
-graph TD
-    A[User Input] --> B[React Frontend]
-    B --> C{Gemini 3.1 Pro API}
-    C -->|System Instruction| D[Reasoning Engine]
-    D --> E[Relevance Check]
-    E -->|Relevant| F[Generate Overview, Hints & Solution]
-    E -->|Irrelevant| G[Return Rejection Message]
-    F --> H[Structured JSON Response]
-    G --> H
-    H --> I[React State Management]
-    I --> J[Progressive UI Revelation]
-    J --> K[User Interaction]
-    K -->|Reveal Hint| J
-    K -->|Reveal Solution| L[Code Editor View]
+graph TB
+    subgraph Client [Client Side - React Application]
+        UI[User Interface - Terminal Theme]
+        Input[Problem Input Field]
+        State[React State Management<br/>'messages', 'activeSession', 'visibleHintsCount']
+        
+        subgraph Rendering [Rendering Engine]
+            Markdown[React Markdown Renderer]
+            Syntax[Prism Syntax Highlighter<br/>'vscDarkPlus' theme]
+        end
+    end
+
+    subgraph API [External Services]
+        Gemini[Google Gemini 3.1 Pro API]
+        Env[Environment Variables<br/>'GEMINI_API_KEY']
+    end
+
+    subgraph Logic [AI Reasoning & Socratic Logic]
+        SysInst[System Instruction<br/>'Socratic Tutor Role']
+        Schema[JSON Response Schema Enforcement]
+        
+        subgraph Pipeline [Processing Pipeline]
+            RelCheck{Relevance Check}
+            GenHints[Generate 3-4 Progressive Hints]
+            GenSol[Generate Python Solution]
+        end
+    end
+
+    Input -->|Submit| State
+    State -->|API Call| Gemini
+    Env --> Gemini
+    Gemini -->|Process| SysInst
+    SysInst --> RelCheck
+    RelCheck -->|Is Programming?| GenHints
+    GenHints --> GenSol
+    GenSol --> Schema
+    Schema -->|Structured JSON| State
+    State --> Rendering
+    Rendering --> UI
+    UI -->|Reveal Hint/Solution| State
 ```
 
 ### Socratic Prompting Strategy
