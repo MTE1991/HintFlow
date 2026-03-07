@@ -1,0 +1,5 @@
+{
+  "name": "HintFlow",
+  "description": "An AI coding tutor that provides progressive hints and pointers for programming problems, helping beginners learn by doing rather than just copying solutions.",
+  "requestFramePermissions": []
+}

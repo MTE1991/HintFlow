@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-[#e0e0e0] font-mono;
+  }
+}
+
+.terminal-glow {
+  text-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+}
+
+.terminal-border {
+  @apply border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.1)];
+}
+
