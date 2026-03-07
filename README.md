@@ -2,21 +2,24 @@
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
+
 ## ✨ Features
 
 - **Socratic Tutoring**: Provides high-level overviews and conceptual nudges before showing code.
 - **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to implementation details.
 - **Python-Focused**: All solutions and hints are tailored for Python, the ideal language for beginners.
 - **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting and line numbers.
+- **Relevance Filtering**: Intelligently identifies and filters out non-programming prompts to stay focused on coding education.
 - **Terminal Aesthetic**: A clean, dark-themed UI inspired by classic developer environments.
 - **No Spoilers**: Solutions are hidden behind a "Reveal" button to prevent accidental spoilers.
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite
-- **AI Engine**: Google Gemini 3.0 Flash (via `@google/genai`)
+- **AI Engine**: Google Gemini 3.1 Pro (via `@google/genai`)
 - **Styling**: Tailwind CSS 4
-- **Animations**: Motion (formerly Framer Motion)
+- **Animations**: Motion
 - **Icons**: Lucide React
 - **Syntax Highlighting**: React Syntax Highlighter (Prism)
 - **Markdown**: React Markdown
@@ -63,6 +66,7 @@ The app will be available at `http://localhost:3000`.
 ## 📖 How to Use
 
 1. **Enter a Problem**: Paste a coding problem statement (e.g., "Write a function to check if a number is prime").
+   - *Note: HintFlow will filter out prompts that are not related to programming.*
 2. **Read the Overview**: HintFlow will provide a conceptual explanation of the problem.
 3. **Reveal Hints**: Click "Reveal Next Hint" to get progressive clues about the logic and syntax.
 4. **Solve It**: Try to write the code yourself based on the hints!

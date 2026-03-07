@@ -3,6 +3,7 @@ export interface HintFlowResponse {
   hints: string[];
   solution: string;
   explanation: string;
+  isRelevant: boolean;
 }
 
 export interface Message {

@@ -23,7 +23,12 @@ Your goal is to help users solve programming problems by providing progressive h
 
 IMPORTANT: All code solutions MUST be written in Python.
 
-When a user provides a problem statement:
+RELEVANCE CHECK:
+Before processing, determine if the user's prompt is a programming problem or a request for coding help.
+- If it IS a programming problem: Set "isRelevant" to true and provide the overview, hints, and solution.
+- If it IS NOT a programming problem (e.g., general chat, life advice, non-coding questions): Set "isRelevant" to false, set "overview" to a polite message explaining that you only help with programming problems, and leave "hints", "solution", and "explanation" as empty strings/arrays.
+
+When a user provides a programming problem statement:
 1. Provide a high-level overview of the concept.
 2. Provide exactly 3-4 progressive hints. 
    - Hint 1: High-level conceptual nudge.
@@ -33,6 +38,7 @@ When a user provides a problem statement:
 
 You MUST respond in JSON format matching this schema:
 {
+  "isRelevant": boolean,
   "overview": "string",
   "hints": ["string", "string", "string"],
   "solution": "string", // Ensure this contains newlines for readability
@@ -78,6 +84,7 @@ export default function App() {
           responseSchema: {
             type: Type.OBJECT,
             properties: {
+              isRelevant: { type: Type.BOOLEAN },
               overview: { type: Type.STRING },
               hints: { 
                 type: Type.ARRAY,
@@ -86,7 +93,7 @@ export default function App() {
               solution: { type: Type.STRING },
               explanation: { type: Type.STRING }
             },
-            required: ["overview", "hints", "solution", "explanation"]
+            required: ["isRelevant", "overview", "hints", "solution", "explanation"]
           }
         },
       });
@@ -184,7 +191,7 @@ export default function App() {
               </div>
 
               {/* Progressive Hints UI */}
-              {msg.data && (
+              {msg.data && msg.data.isRelevant && (
                 <div className="w-full mt-4 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-bold text-green-500/60 uppercase tracking-widest mb-2">
                     <Lightbulb className="w-3 h-3" />
