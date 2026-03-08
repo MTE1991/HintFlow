@@ -1,20 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
   body {
-    @apply font-mono transition-colors duration-300;
-  }
-  
-  .dark body {
-    @apply bg-[#050505] text-[#f0f0f0];
-  }
-  
-  .light body {
-    @apply bg-[#f8fafc] text-[#1e293b];
+    @apply bg-[#0a0a0a] text-[#e0e0e0] font-mono;
   }
 }
 

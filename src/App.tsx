@@ -270,7 +270,8 @@ export default function App() {
                               margin: 0, 
                               background: 'transparent',
                               padding: '1.5rem',
-                              lineHeight: '1.6'
+                              lineHeight: '1.6',
+                              fontFamily: '"Fira Code", monospace'
                             }}
                           >
                             {msg.data.solution}
