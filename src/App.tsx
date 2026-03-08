@@ -35,6 +35,7 @@ When a user provides a programming problem statement:
    - Hint 2: Logical structure or algorithm hint.
    - Hint 3: Specific syntax or implementation detail.
 3. Provide the full solution (Python code only, well-formatted with newlines) and a detailed explanation.
+4. Provide exactly 3 popular external resources (name and URL) for further learning.
 
 You MUST respond in JSON format matching this schema:
 {
@@ -42,7 +43,10 @@ You MUST respond in JSON format matching this schema:
   "overview": "string",
   "hints": ["string", "string", "string"],
   "solution": "string", // Ensure this contains newlines for readability
-  "explanation": "string"
+  "explanation": "string",
+  "resources": [
+    { "name": "string", "url": "string" }
+  ]
 }`;
 
 export default function App() {
@@ -91,9 +95,20 @@ export default function App() {
                 items: { type: Type.STRING }
               },
               solution: { type: Type.STRING },
-              explanation: { type: Type.STRING }
+              explanation: { type: Type.STRING },
+              resources: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    url: { type: Type.STRING }
+                  },
+                  required: ["name", "url"]
+                }
+              }
             },
-            required: ["isRelevant", "overview", "hints", "solution", "explanation"]
+            required: ["isRelevant", "overview", "hints", "solution", "explanation", "resources"]
           }
         },
       });
@@ -265,6 +280,28 @@ export default function App() {
                       <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg text-sm italic text-zinc-400">
                         <Markdown>{msg.data.explanation}</Markdown>
                       </div>
+
+                      {msg.data.resources && msg.data.resources.length > 0 && (
+                        <div className="pt-4 border-t border-zinc-800/50">
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                            Recommended Learning Resources
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {msg.data.resources.map((res, rIdx) => (
+                              <a
+                                key={rIdx}
+                                href={res.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-green-500/30 transition-all group"
+                              >
+                                <span className="text-xs text-zinc-400 group-hover:text-green-400 transition-colors">{res.name}</span>
+                                <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-green-500" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </div>

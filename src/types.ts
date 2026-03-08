@@ -4,6 +4,7 @@ export interface HintFlowResponse {
   solution: string;
   explanation: string;
   isRelevant: boolean;
+  resources?: { name: string; url: string }[];
 }
 
 export interface Message {
