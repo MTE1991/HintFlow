@@ -5,9 +5,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { clsx, type ClassValue } from 'clsx';
@@ -34,6 +36,7 @@ When a user provides a programming problem statement:
    - Hint 1: High-level conceptual nudge.
    - Hint 2: Logical structure or algorithm hint.
    - Hint 3: Specific syntax or implementation detail.
+   - MATH SUPPORT: Use LaTeX syntax for math symbols, formulas, and equations when helpful for clarity (e.g., $O(n^2)$, $\sum_{i=1}^{n} i$, or Big O notation). Use single dollar signs $...$ for inline math and double dollar signs $$...$$ for block equations.
 3. Provide the full solution in three languages: C, C++, and Python.
 4. Provide a detailed explanation of the logic.
 5. Provide learning resources:
@@ -66,6 +69,7 @@ export default function App() {
   const [visibleHintsCount, setVisibleHintsCount] = useState(0);
   const [showSolution, setShowSolution] = useState(false);
   const [selectedLang, setSelectedLang] = useState<'c' | 'cpp' | 'python'>('python');
+  const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -180,6 +184,12 @@ export default function App() {
     setInput('');
   };
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
       {/* Header */}
@@ -234,7 +244,7 @@ export default function App() {
                   {msg.role === 'user' ? 'Student' : 'HintFlow'}
                 </div>
                 <div className="prose prose-invert prose-sm max-w-none">
-                  <Markdown>
+                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                     {msg.content}
                   </Markdown>
                 </div>
@@ -258,7 +268,7 @@ export default function App() {
                       >
                         <span className="text-green-500 font-bold shrink-0">0{hIdx + 1}.</span>
                         <div className="prose prose-invert prose-sm">
-                          <Markdown>{hint}</Markdown>
+                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{hint}</Markdown>
                         </div>
                       </motion.div>
                     ))}
@@ -290,49 +300,104 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="space-y-4"
                     >
-                      <div className="p-4 bg-zinc-900 border border-amber-500/20 rounded-lg">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-widest">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Solution Implementation
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col">
+                        {/* Editor Header */}
+                        <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/50 border-b border-zinc-800">
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-1.5">
+                              <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40" />
+                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/40" />
+                              <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/40" />
+                            </div>
+                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                              <Code className="w-3 h-3" />
+                              solution.{selectedLang === 'cpp' ? 'cpp' : selectedLang}
+                            </span>
                           </div>
-                          <div className="flex items-center bg-black/40 rounded-md p-0.5 border border-zinc-800">
-                            {(['c', 'cpp', 'python'] as const).map((lang) => (
-                              <button
-                                key={lang}
-                                onClick={() => setSelectedLang(lang)}
-                                className={cn(
-                                  "px-2 py-1 text-[10px] font-bold rounded uppercase transition-all",
-                                  selectedLang === lang 
-                                    ? "bg-amber-500 text-black shadow-lg" 
-                                    : "text-zinc-500 hover:text-zinc-300"
+                          
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center bg-black/40 rounded p-0.5 border border-zinc-700/50">
+                              {(['c', 'cpp', 'python'] as const).map((lang) => (
+                                <button
+                                  key={lang}
+                                  onClick={() => setSelectedLang(lang)}
+                                  className={cn(
+                                    "px-2 py-0.5 text-[9px] font-bold rounded uppercase transition-all",
+                                    selectedLang === lang 
+                                      ? "bg-amber-500/20 text-amber-500" 
+                                      : "text-zinc-600 hover:text-zinc-400"
+                                  )}
+                                >
+                                  {lang === 'cpp' ? 'C++' : lang}
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              onClick={() => handleCopy(msg.data.solutions[selectedLang])}
+                              className="p-1 hover:bg-zinc-700 rounded transition-colors text-zinc-500 hover:text-zinc-300 relative group"
+                              title="Copy Code"
+                            >
+                              <AnimatePresence mode="wait">
+                                {copied ? (
+                                  <motion.div
+                                    key="check"
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.5, opacity: 0 }}
+                                  >
+                                    <Check className="w-3.5 h-3.5 text-green-500" />
+                                  </motion.div>
+                                ) : (
+                                  <motion.div
+                                    key="copy"
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.5, opacity: 0 }}
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </motion.div>
                                 )}
-                              >
-                                {lang === 'cpp' ? 'C++' : lang}
-                              </button>
-                            ))}
+                              </AnimatePresence>
+                            </button>
                           </div>
                         </div>
-                        <div className="rounded-lg border border-zinc-800 overflow-hidden text-xs bg-black/30">
+
+                        {/* Editor Content */}
+                        <div className="text-xs bg-black/20">
                           <SyntaxHighlighter
                             language={selectedLang === 'python' ? 'python' : 'cpp'}
                             style={vscDarkPlus}
                             showLineNumbers={true}
-                            lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1em', color: '#4b5563', textAlign: 'right' }}
+                            lineNumberStyle={{ minWidth: '3em', paddingRight: '1.5em', color: '#374151', textAlign: 'right', userSelect: 'none' }}
                             customStyle={{ 
                               margin: 0, 
                               background: 'transparent',
                               padding: '1.5rem',
-                              lineHeight: '1.6',
+                              lineHeight: '1.7',
                               fontFamily: '"Fira Code", monospace'
                             }}
                           >
                             {msg.data.solutions[selectedLang]}
                           </SyntaxHighlighter>
                         </div>
+
+                        {/* Editor Footer / Status Bar */}
+                        <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-800/30 border-t border-zinc-800 text-[9px] font-mono text-zinc-600">
+                          <div className="flex items-center gap-4">
+                            <span>Ln {msg.data.solutions[selectedLang].split('\n').length}, Col 1</span>
+                            <span>UTF-8</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500/40" />
+                              Ready
+                            </span>
+                            <span className="uppercase">{selectedLang === 'cpp' ? 'C++' : selectedLang === 'c' ? 'C' : 'Python 3'}</span>
+                          </div>
+                        </div>
                       </div>
                       <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg text-sm italic text-zinc-400">
-                        <Markdown>{msg.data.explanation}</Markdown>
+                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.data.explanation}</Markdown>
                       </div>
 
                       {msg.data.resources && (

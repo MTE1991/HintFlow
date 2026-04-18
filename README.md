@@ -13,6 +13,7 @@
 - **Recommended Resources**: Automatically suggests relevant books (title and author) and online resources (name and URL) to help users expand their knowledge after seeing the solution.
 - **Relevance Filtering**: Intelligently identifies and filters out non-programming prompts to stay focused on coding education.
 - **Terminal Aesthetic**: A clean, dark-themed UI inspired by classic developer environments.
+- **Math Support**: Full LaTeX support for mathematical symbols and equations using KaTeX, perfect for algorithm complexity and data science problems.
 - **No Spoilers**: Solutions are hidden behind a "Reveal" button to prevent accidental spoilers.
 
 ## 🛠️ Tech Stack
