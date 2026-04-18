@@ -102,7 +102,8 @@ graph TB
         subgraph Pipeline [Processing Pipeline]
             RelCheck{Relevance Check}
             GenHints[Generate 3-4 Progressive Hints]
-            GenSol[Generate Python Solution]
+            GenSol[Generate solutions in C/C++/Python]
+            Reject[Polite Rejection Message]
         end
     end
 
@@ -111,9 +112,11 @@ graph TB
     Env --> Gemini
     Gemini -->|Process| SysInst
     SysInst --> RelCheck
-    RelCheck -->|Is Programming?| GenHints
+    RelCheck -->|Yes: Learning Mode| GenHints
+    RelCheck -->|No: Off-topic| Reject
     GenHints --> GenSol
     GenSol --> Schema
+    Reject --> Schema
     Schema -->|Structured JSON| State
     State --> Rendering
     Rendering --> UI
