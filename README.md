@@ -1,18 +1,16 @@
 # HintFlow 🚀
 
-## About HintFlow
-
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
-<!-- ![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600) -->
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
 
 ## ✨ Features
 
 - **Socratic Tutoring**: Provides high-level overviews and conceptual nudges before showing code.
 - **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to implementation details.
-- **Python-Focused**: All solutions and hints are tailored for Python, the ideal language for beginners.
-- **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting and line numbers.
-- **Recommended Resources**: Automatically suggests 3 popular external resources (like Python.org, W3Schools, or Real Python) to help users expand their knowledge after seeing the solution.
+- **Multi-Language Support**: Provides solutions in C, C++, and Python, allowing students to compare implementations across different paradigms.
+- **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting, line numbers, and a language toggle.
+- **Recommended Resources**: Automatically suggests relevant books (title and author) and online resources (name and URL) to help users expand their knowledge after seeing the solution.
 - **Relevance Filtering**: Intelligently identifies and filters out non-programming prompts to stay focused on coding education.
 - **Terminal Aesthetic**: A clean, dark-themed UI inspired by classic developer environments.
 - **No Spoilers**: Solutions are hidden behind a "Reveal" button to prevent accidental spoilers.
@@ -126,7 +124,8 @@ HintFlow uses a specialized **System Instruction** to guide the Gemini 3.1 Pro m
 1. **Relevance Check**: The model first evaluates if the input is a programming problem.
 2. **Conceptual Overview**: It identifies the core CS concepts involved (e.g., recursion, data structures).
 3. **Hint Generation**: It creates 3-4 hints that progressively move from abstract logic to specific implementation details.
-4. **Solution Guarding**: It provides a full, well-formatted Python solution and a deep-dive explanation.
+5. **Solution Guarding**: It provides full, well-formatted solutions in C, C++, and Python, along with a deep-dive explanation.
+6. **Curated Resources**: It identifies 3 relevant books and 3 high-authority online resources for continued learning. If no relevant books are found, it only provides online resources.
 
 ### Structured Data Flow
 To ensure the UI remains consistent, HintFlow leverages **JSON Schema** enforcement. The Gemini API returns a structured object:
@@ -135,8 +134,16 @@ To ensure the UI remains consistent, HintFlow leverages **JSON Schema** enforcem
   "isRelevant": boolean,
   "overview": "string",
   "hints": ["string", "string", "string"],
-  "solution": "string",
-  "explanation": "string"
+  "solutions": {
+    "c": "string",
+    "cpp": "string",
+    "python": "string"
+  },
+  "explanation": "string",
+  "resources": {
+    "books": [{ "title": "string", "author": "string" }],
+    "websites": [{ "name": "string", "url": "string" }]
+  }
 }
 ```
 This allows the React frontend to parse the response reliably and manage the state of hidden/revealed content.

@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2 } from 'lucide-react';
+import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -21,12 +21,12 @@ function cn(...inputs: ClassValue[]) {
 const SYSTEM_INSTRUCTION = `You are HintFlow, a Socratic coding tutor for beginner computer science students. 
 Your goal is to help users solve programming problems by providing progressive hints rather than immediate solutions.
 
-IMPORTANT: All code solutions MUST be written in Python.
+IMPORTANT: You MUST provide code solutions in C, C++, and Python.
 
 RELEVANCE CHECK:
 Before processing, determine if the user's prompt is a programming problem or a request for coding help.
-- If it IS a programming problem: Set "isRelevant" to true and provide the overview, hints, and solution.
-- If it IS NOT a programming problem (e.g., general chat, life advice, non-coding questions): Set "isRelevant" to false, set "overview" to a polite message explaining that you only help with programming problems, and leave "hints", "solution", and "explanation" as empty strings/arrays.
+- If it IS a programming problem: Set "isRelevant" to true and provide the overview, hints, and solutions.
+- If it IS NOT a programming problem (e.g., general chat, life advice, non-coding questions): Set "isRelevant" to false, set "overview" to a polite message explaining that you only help with programming problems, and leave "hints", "solutions", "explanation", and "resources" as empty.
 
 When a user provides a programming problem statement:
 1. Provide a high-level overview of the concept.
@@ -34,19 +34,28 @@ When a user provides a programming problem statement:
    - Hint 1: High-level conceptual nudge.
    - Hint 2: Logical structure or algorithm hint.
    - Hint 3: Specific syntax or implementation detail.
-3. Provide the full solution (Python code only, well-formatted with newlines) and a detailed explanation.
-4. Provide exactly 3 popular external resources (name and URL) for further learning.
+3. Provide the full solution in three languages: C, C++, and Python.
+4. Provide a detailed explanation of the logic.
+5. Provide learning resources:
+   - exactly 3 relevant books (include "title" and "author").
+   - exactly 3 relevant websites/webpages (include "name" and "url").
+   - If no relevant books are found for this specific topic, leave the "books" array empty.
 
 You MUST respond in JSON format matching this schema:
 {
   "isRelevant": boolean,
   "overview": "string",
   "hints": ["string", "string", "string"],
-  "solution": "string", // Ensure this contains newlines for readability
+  "solutions": {
+    "c": "string",
+    "cpp": "string",
+    "python": "string"
+  },
   "explanation": "string",
-  "resources": [
-    { "name": "string", "url": "string" }
-  ]
+  "resources": {
+    "books": [{ "title": "string", "author": "string" }],
+    "websites": [{ "name": "string", "url": "string" }]
+  }
 }`;
 
 export default function App() {
@@ -56,6 +65,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<HintFlowResponse | null>(null);
   const [visibleHintsCount, setVisibleHintsCount] = useState(0);
   const [showSolution, setShowSolution] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<'c' | 'cpp' | 'python'>('python');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -94,21 +104,46 @@ export default function App() {
                 type: Type.ARRAY,
                 items: { type: Type.STRING }
               },
-              solution: { type: Type.STRING },
+              solutions: {
+                type: Type.OBJECT,
+                properties: {
+                  c: { type: Type.STRING },
+                  cpp: { type: Type.STRING },
+                  python: { type: Type.STRING }
+                },
+                required: ["c", "cpp", "python"]
+              },
               explanation: { type: Type.STRING },
               resources: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    url: { type: Type.STRING }
+                type: Type.OBJECT,
+                properties: {
+                  books: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING },
+                        author: { type: Type.STRING }
+                      },
+                      required: ["title", "author"]
+                    }
                   },
-                  required: ["name", "url"]
-                }
+                  websites: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING },
+                        url: { type: Type.STRING }
+                      },
+                      required: ["name", "url"]
+                    }
+                  }
+                },
+                required: ["books", "websites"]
               }
             },
-            required: ["isRelevant", "overview", "hints", "solution", "explanation", "resources"]
+            required: ["isRelevant", "overview", "hints", "solutions", "explanation", "resources"]
           }
         },
       });
@@ -256,13 +291,31 @@ export default function App() {
                       className="space-y-4"
                     >
                       <div className="p-4 bg-zinc-900 border border-amber-500/20 rounded-lg">
-                        <div className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-widest mb-3">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Solution Implementation
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-widest">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Solution Implementation
+                          </div>
+                          <div className="flex items-center bg-black/40 rounded-md p-0.5 border border-zinc-800">
+                            {(['c', 'cpp', 'python'] as const).map((lang) => (
+                              <button
+                                key={lang}
+                                onClick={() => setSelectedLang(lang)}
+                                className={cn(
+                                  "px-2 py-1 text-[10px] font-bold rounded uppercase transition-all",
+                                  selectedLang === lang 
+                                    ? "bg-amber-500 text-black shadow-lg" 
+                                    : "text-zinc-500 hover:text-zinc-300"
+                                )}
+                              >
+                                {lang === 'cpp' ? 'C++' : lang}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <div className="rounded-lg border border-zinc-800 overflow-hidden text-xs bg-black/30">
                           <SyntaxHighlighter
-                            language="python"
+                            language={selectedLang === 'python' ? 'python' : 'cpp'}
                             style={vscDarkPlus}
                             showLineNumbers={true}
                             lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1em', color: '#4b5563', textAlign: 'right' }}
@@ -274,7 +327,7 @@ export default function App() {
                               fontFamily: '"Fira Code", monospace'
                             }}
                           >
-                            {msg.data.solution}
+                            {msg.data.solutions[selectedLang]}
                           </SyntaxHighlighter>
                         </div>
                       </div>
@@ -282,25 +335,52 @@ export default function App() {
                         <Markdown>{msg.data.explanation}</Markdown>
                       </div>
 
-                      {msg.data.resources && msg.data.resources.length > 0 && (
-                        <div className="pt-4 border-t border-zinc-800/50">
-                          <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
-                            Recommended Learning Resources
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {msg.data.resources.map((res, rIdx) => (
-                              <a
-                                key={rIdx}
-                                href={res.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-green-500/30 transition-all group"
-                              >
-                                <span className="text-xs text-zinc-400 group-hover:text-green-400 transition-colors">{res.name}</span>
-                                <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-green-500" />
-                              </a>
-                            ))}
-                          </div>
+                      {msg.data.resources && (
+                        <div className="pt-4 border-t border-zinc-800/50 space-y-6">
+                          {/* Books Section */}
+                          {msg.data.resources.books.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                                <BookOpen className="w-3 h-3 text-amber-500/60" />
+                                Recommended Books
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {msg.data.resources.books.map((book, bIdx) => (
+                                  <div
+                                    key={bIdx}
+                                    className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg flex flex-col justify-between"
+                                  >
+                                    <span className="text-xs font-bold text-zinc-300 leading-tight mb-1">{book.title}</span>
+                                    <span className="text-[10px] text-zinc-500 italic">— {book.author}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Websites Section */}
+                          {msg.data.resources.websites.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                                <Globe className="w-3 h-3 text-green-500/60" />
+                                Online Resources
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {msg.data.resources.websites.map((res, rIdx) => (
+                                  <a
+                                    key={rIdx}
+                                    href={res.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-green-500/30 transition-all group"
+                                  >
+                                    <span className="text-xs text-zinc-400 group-hover:text-green-400 transition-colors line-clamp-1">{res.name}</span>
+                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-green-500" />
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </motion.div>
