@@ -72,6 +72,7 @@ When a user provides a programming problem statement:
    - FORMATTING: Ensure all code follows industry-standard formatting.
    - Python: Strictly follow PEP 8 (4-space indentation, snake_case, etc.).
    - C/C++: Follow standard conventions (consistent indentation, clear variable naming, proper use of include guards/headers).
+   - CLEANLINESS: Do NOT include excessive blank lines or literal escape characters like "\\n\\n" in the code strings. Output clean, ready-to-run code.
 4. Provide a detailed explanation of the logic.
 5. Provide learning resources:
    - exactly 3 relevant books (include "title" and "author").
@@ -222,6 +223,12 @@ export default function App() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const cleanCode = (code: string) => {
+    return code
+      .trim()
+      .replace(/\n{3,}/g, '\n\n');
   };
 
   return (
@@ -377,7 +384,7 @@ export default function App() {
                               ))}
                             </div>
                             <button
-                              onClick={() => handleCopy(msg.data.solutions[selectedLang])}
+                              onClick={() => handleCopy(cleanCode(msg.data.solutions[selectedLang]))}
                               className="p-1 hover:bg-zinc-700 rounded transition-colors text-zinc-500 hover:text-zinc-300 relative group"
                               title="Copy Code"
                             >
@@ -421,14 +428,14 @@ export default function App() {
                               fontFamily: '"Fira Code", monospace'
                             }}
                           >
-                            {msg.data.solutions[selectedLang]}
+                            {cleanCode(msg.data.solutions[selectedLang])}
                           </SyntaxHighlighter>
                         </div>
 
                         {/* Editor Footer / Status Bar */}
                         <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-800/30 border-t border-zinc-800 text-[9px] font-mono text-zinc-600">
                           <div className="flex items-center gap-4">
-                            <span>Ln {msg.data.solutions[selectedLang].split('\n').length}, Col 1</span>
+                            <span>Ln {cleanCode(msg.data.solutions[selectedLang]).split('\n').length}, Col 1</span>
                             <span>UTF-8</span>
                           </div>
                           <div className="flex items-center gap-4">
