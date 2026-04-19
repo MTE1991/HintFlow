@@ -2,13 +2,14 @@
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
-<!-- ![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600) -->
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
 
 ## ✨ Features
 
 - **Socratic Tutoring**: Provides high-level overviews and conceptual nudges before showing code.
-- **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to implementation details.
+- **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to specific syntax details, now including **helpful code snippets** for clearer implementation cues.
 - **Multi-Language Support**: Provides solutions in C, C++, and Python, allowing students to compare implementations across different paradigms.
+- **Academic Standards**: All code solutions follow professional formatting standards (PEP 8 for Python; standard C/C++ conventions) to encourage best practices from day one.
 - **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting, line numbers, and a language toggle.
 - **Recommended Resources**: Automatically suggests relevant books (title and author) and online resources (name and URL) to help users expand their knowledge after seeing the solution.
 - **Relevance Filtering**: Intelligently identifies and filters out non-programming prompts to stay focused on coding education.

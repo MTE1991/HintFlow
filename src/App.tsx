@@ -20,6 +20,36 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const markdownComponents = {
+  code({ inline, className, children, ...props }: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    return !inline && match ? (
+      <div className="my-3 rounded-lg overflow-hidden border border-zinc-800">
+        <SyntaxHighlighter
+          language={match[1]}
+          style={vscDarkPlus}
+          PreTag="div"
+          customStyle={{ 
+            margin: 0, 
+            background: '#000',
+            padding: '1rem',
+            fontSize: '11px',
+            lineHeight: '1.5',
+            fontFamily: '"Fira Code", monospace'
+          }}
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      </div>
+    ) : (
+      <code className={cn("bg-zinc-800 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-500/80", className)} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
+
 const SYSTEM_INSTRUCTION = `You are HintFlow, a Socratic coding tutor for beginner computer science students. 
 Your goal is to help users solve programming problems by providing progressive hints rather than immediate solutions.
 
@@ -37,7 +67,11 @@ When a user provides a programming problem statement:
    - Hint 2: Logical structure or algorithm hint.
    - Hint 3: Specific syntax or implementation detail.
    - MATH SUPPORT: Use LaTeX syntax for math symbols, formulas, and equations when helpful for clarity (e.g., $O(n^2)$, $\sum_{i=1}^{n} i$, or Big O notation). Use single dollar signs $...$ for inline math and double dollar signs $$...$$ for block equations.
+   - CODE SNIPPETS: Include small code snippets (1-5 lines) in the hints when explaining syntax or structural logic. Wrap them in markdown code blocks.
 3. Provide the full solution in three languages: C, C++, and Python.
+   - FORMATTING: Ensure all code follows industry-standard formatting.
+   - Python: Strictly follow PEP 8 (4-space indentation, snake_case, etc.).
+   - C/C++: Follow standard conventions (consistent indentation, clear variable naming, proper use of include guards/headers).
 4. Provide a detailed explanation of the logic.
 5. Provide learning resources:
    - exactly 3 relevant books (include "title" and "author").
@@ -244,7 +278,11 @@ export default function App() {
                   {msg.role === 'user' ? 'Student' : 'HintFlow'}
                 </div>
                 <div className="prose prose-invert prose-sm max-w-none">
-                  <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  <Markdown 
+                    remarkPlugins={[remarkMath]} 
+                    rehypePlugins={[rehypeKatex]}
+                    components={markdownComponents}
+                  >
                     {msg.content}
                   </Markdown>
                 </div>
@@ -268,7 +306,13 @@ export default function App() {
                       >
                         <span className="text-green-500 font-bold shrink-0">0{hIdx + 1}.</span>
                         <div className="prose prose-invert prose-sm">
-                          <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{hint}</Markdown>
+                          <Markdown 
+                            remarkPlugins={[remarkMath]} 
+                            rehypePlugins={[rehypeKatex]}
+                            components={markdownComponents}
+                          >
+                            {hint}
+                          </Markdown>
                         </div>
                       </motion.div>
                     ))}
@@ -397,7 +441,13 @@ export default function App() {
                         </div>
                       </div>
                       <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg text-sm italic text-zinc-400">
-                        <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.data.explanation}</Markdown>
+                        <Markdown 
+                          remarkPlugins={[remarkMath]} 
+                          rehypePlugins={[rehypeKatex]}
+                          components={markdownComponents}
+                        >
+                          {msg.data.explanation}
+                        </Markdown>
                       </div>
 
                       {msg.data.resources && (
