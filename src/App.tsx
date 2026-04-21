@@ -372,7 +372,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-0 md:p-4 lg:p-8 bg-black overflow-hidden font-mono antialiased">
+    <div className="h-[100dvh] w-full flex items-center justify-center p-0 md:p-4 lg:p-8 bg-black overflow-hidden font-mono antialiased">
       {/* Terminal Window */}
       <div className="w-full h-full max-w-6xl md:h-[90vh] flex flex-col bg-[#0c0c0c] md:border md:border-[#333] shadow-2xl relative overflow-hidden md:rounded-lg">
         
@@ -439,7 +439,7 @@ export default function App() {
           {/* Scrollable Output */}
           <div 
             ref={scrollRef}
-            className="flex-1 overflow-y-auto space-y-6 terminal-scroll md:pr-4"
+            className="flex-1 overflow-y-auto space-y-6 terminal-scroll md:pr-4 touch-auto"
           >
             {messages.length === 0 && (
               <div className="space-y-4 opacity-80 text-xs md:text-sm">
@@ -594,7 +594,7 @@ export default function App() {
       {/* Solution Modal (Terminal Styled) */}
       <AnimatePresence>
         {modalData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-8 lg:p-16 bg-black/95 md:bg-black/90 backdrop-blur-sm uppercase-none">
+          <div className="fixed inset-0 h-[100dvh] w-full z-50 flex items-center justify-center p-0 md:p-8 lg:p-16 bg-black/95 md:bg-black/90 backdrop-blur-sm uppercase-none">
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}

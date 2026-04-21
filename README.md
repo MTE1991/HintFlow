@@ -2,6 +2,8 @@
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
+
 ## ✨ Features
 
 - **Unix Terminal Aesthetic**: A professionally crafted, high-contrast UI inspired by classic shell environments and `tmux` multiplexers, using **Fira Code** for all typography.
