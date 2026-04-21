@@ -50,10 +50,10 @@ const markdownComponents = {
   },
 };
 
-const SYSTEM_INSTRUCTION = `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
+const SYSTEM_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
 
 ### 🛡️ Core Rules
-- **Languages**: You MUST always provide solutions in **C**, **C++**, and **Python**.
+- **Language**: You MUST provide the final solution in **${lang}**.
 - **Role**: Act as a supportive, expert mentor. Use encouraging but professional language.
 - **Socratic Method**: Do not reveal code logic directly in the initial overview. Use the overview to set the stage and the hints to build the bridge.
 
@@ -73,7 +73,7 @@ Provide between **3 and 5 hints**, each more revealing than the last. Each hint 
 - **Level 1: The "Mental Model"**: Focus on pure logic, analogies, or the mathematical "why". (e.g., "Think of this like finding a book in a library"). NO CODE.
 - **Level 2: The "Strategy"**: Describe the algorithmic approach at a high level. (e.g., "We can use a 'divide and conquer' strategy here").
 - **Level 3: The "Structural Blueprint"**: Translate the strategy into programming constructs. Mention specific data structures or control flows (loops, branches).
-- **Level 4: The "Tactic/Snippet"**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic. Use one of the 3 supported languages.
+- **Level 4: The "Tactic/Snippet"**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic. Use ${lang}.
 - **Level 5: The "Edge Case Navigator"**: Address subtle pitfalls like null checks, integer overflow, or specific boundary conditions.
 - **Visuals**: Use LaTeX ($...$) for math and markdown code blocks (\`\`\`language) for snippets.
 - **Code Block Integrity**: You MUST ensure every markdown code block is correctly terminated with closing backticks (\`\`\`). Never leave a code block unclosed. Ensure a newline exists after the opening backticks and before the closing backticks for valid syntax highlighting.
@@ -91,7 +91,7 @@ Provide between **3 and 5 hints**, each more revealing than the last. Each hint 
 #### 4. Detailed Explanation (The "Deep Dive")
 Deeply explain the "How" and "Why". 
 - Include **Big O Complexity Analysis** ($O(n)$, $O(1)$, etc.) for Time and Space.
-- Compare how the three languages handle the problem differently (e.g., "Python's brevity vs C's manual control").
+- Focus specifically on how ${lang} features are used to solve this efficiently.
 
 #### 5. Learning Resources
 - **Books**: Suggest 3 actual, high-quality textbooks (e.g., "Introduction to Algorithms" by CLRS, "Clean Code", "Effective C++"). Include Title and Author.
@@ -113,11 +113,8 @@ You MUST strictly respond in JSON format matching this schema:
   "isRelevant": boolean,
   "overview": "string",
   "hints": ["string", "string", "string"],
-  "solutions": {
-    "c": "string",
-    "cpp": "string",
-    "python": "string"
-  },
+  "solution": "string (the full code implementation in ${lang})",
+  "language": "${lang}",
   "explanation": "string",
   "resources": {
     "books": [{ "title": "string", "author": "string" }],
@@ -132,17 +129,17 @@ export default function App() {
     messages: [],
     activeSession: null,
     visibleHintsCount: 0,
-    solved: false
+    solved: false,
+    preferredLanguage: 'python'
   }]);
   const [activeTabId, setActiveTabId] = useState('initial');
   
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
-  const { messages, activeSession, visibleHintsCount, solved } = activeTab;
+  const { messages, activeSession, visibleHintsCount, solved, preferredLanguage } = activeTab;
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [modalData, setModalData] = useState<HintFlowResponse | null>(null);
-  const [selectedLang, setSelectedLang] = useState<'c' | 'cpp' | 'python'>('python');
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -166,7 +163,8 @@ export default function App() {
       messages: [],
       activeSession: null,
       visibleHintsCount: 0,
-      solved: false
+      solved: false,
+      preferredLanguage: activeTab.preferredLanguage
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(id);
@@ -221,8 +219,8 @@ export default function App() {
 
       // In follow-up mode, we want to explain simply.
       const customInstruction = isFollowUp 
-        ? "The user has already seen the solution. Please answer their follow-up question descriptively and directly without hints."
-        : SYSTEM_INSTRUCTION;
+        ? `The user has already seen the solution in ${activeTabState.preferredLanguage}. Please answer their follow-up question descriptively and directly without hints. Use ${activeTabState.preferredLanguage} for any code snippets.`
+        : SYSTEM_INSTRUCTION(activeTabState.preferredLanguage);
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -239,15 +237,8 @@ export default function App() {
                 type: Type.ARRAY,
                 items: { type: Type.STRING }
               },
-              solutions: {
-                type: Type.OBJECT,
-                properties: {
-                  c: { type: Type.STRING },
-                  cpp: { type: Type.STRING },
-                  python: { type: Type.STRING }
-                },
-                required: ["c", "cpp", "python"]
-              },
+              solution: { type: Type.STRING },
+              language: { type: Type.STRING },
               explanation: { type: Type.STRING },
               resources: {
                 type: Type.OBJECT,
@@ -278,7 +269,7 @@ export default function App() {
                 required: ["books", "websites"]
               }
             },
-            required: ["isRelevant", "overview", "hints", "solutions", "explanation", "resources"]
+            required: ["isRelevant", "overview", "hints", "solution", "language", "explanation", "resources"]
           }
         },
       });
@@ -352,7 +343,8 @@ export default function App() {
       messages: [],
       activeSession: null,
       visibleHintsCount: 0,
-      solved: false
+      solved: false,
+      preferredLanguage: 'python'
     }]);
     setActiveTabId('initial');
     setModalData(null);
@@ -555,11 +547,40 @@ export default function App() {
 
           {/* Prompt Area */}
           <div className="mt-auto pt-4 md:pt-6 border-t border-[#333]/50">
-             {solved && (
-              <div className="text-[9px] md:text-[10px] text-amber-500/60 uppercase tracking-widest mb-2 italic">
-                # Follow-up enabled. Ask questions about the implementation.
-              </div>
-            )}
+             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+               {solved ? (
+                <div className="text-[9px] md:text-[10px] text-amber-500/60 uppercase tracking-widest italic">
+                  # Follow-up enabled. Ask questions about the implementation.
+                </div>
+               ) : (
+                <div className="flex items-center gap-4">
+                  <span className="text-[9px] md:text-[10px] text-[#00ff41]/40 uppercase tracking-widest font-bold">Target Language:</span>
+                  <div className="flex items-center gap-2">
+                    {(['python', 'cpp', 'c'] as const).map((lang) => (
+                      <button
+                        key={lang}
+                        onClick={() => updateActiveTab({ preferredLanguage: lang })}
+                        className={cn(
+                          "px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest transition-all border",
+                          preferredLanguage === lang 
+                            ? "bg-[#00ff41] text-black border-[#00ff41]" 
+                            : "text-[#00ff41] border-[#00ff41]/20 hover:border-[#00ff41]/50"
+                        )}
+                        disabled={isLoading}
+                      >
+                        {lang === 'cpp' ? 'C++' : lang}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+               )}
+               {!solved && messages.length > 0 && (
+                 <div className="text-[9px] text-[#00ff41]/30 italic">
+                   * Language locked for this active session.
+                 </div>
+               )}
+             </div>
+
             <form 
               onSubmit={handleSubmit}
               className="flex flex-col md:flex-row md:items-start gap-1 md:gap-2 group"
@@ -621,29 +642,18 @@ export default function App() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between px-3 py-2 bg-[#111] border-b border-[#222] gap-3">
                     <div className="flex items-center gap-2">
                        <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                        SRC: solution.{selectedLang === 'cpp' ? 'cpp' : selectedLang}
+                        SRC: solution.{modalData.language === 'cpp' ? 'cpp' : modalData.language}
                       </span>
                     </div>
                     
                     <div className="flex items-center justify-between md:justify-end gap-6 overflow-x-auto">
-                      <div className="flex items-center gap-3 md:gap-4 shrink-0">
-                        {(['c', 'cpp', 'python'] as const).map((lang) => (
-                          <button
-                            key={lang}
-                            onClick={() => setSelectedLang(lang)}
-                            className={cn(
-                              "text-[8px] md:text-[9px] font-bold uppercase tracking-widest transition-all",
-                              selectedLang === lang 
-                                ? "text-amber-500 border-b border-amber-500" 
-                                : "text-zinc-600 hover:text-zinc-400"
-                            )}
-                          >
-                            {lang === 'cpp' ? 'C++' : lang}
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-2 shrink-0">
+                         <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest border-b border-amber-500">
+                           {modalData.language === 'cpp' ? 'C++' : modalData.language}
+                         </span>
                       </div>
                       <button
-                        onClick={() => handleCopy(cleanCode(modalData.solutions[selectedLang]))}
+                        onClick={() => handleCopy(cleanCode(modalData.solution))}
                         className="text-zinc-500 hover:text-[#00ff41] transition-colors shrink-0"
                         title="COPY"
                       >
@@ -655,7 +665,7 @@ export default function App() {
                   {/* Editor Content */}
                   <div className="text-[10px] md:text-xs overflow-x-auto">
                     <SyntaxHighlighter
-                      language={selectedLang === 'python' ? 'python' : 'cpp'}
+                      language={modalData.language === 'python' ? 'python' : 'cpp'}
                       style={vscDarkPlus}
                       showLineNumbers={true}
                       lineNumberStyle={{ minWidth: '3em', paddingRight: '1rem', color: '#222', textAlign: 'right', userSelect: 'none' }}
@@ -667,7 +677,7 @@ export default function App() {
                         fontFamily: '"Fira Code", monospace'
                       }}
                     >
-                      {cleanCode(modalData.solutions[selectedLang])}
+                      {cleanCode(modalData.solution)}
                     </SyntaxHighlighter>
                   </div>
                 </div>

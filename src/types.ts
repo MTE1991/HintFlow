@@ -1,11 +1,8 @@
 export interface HintFlowResponse {
   overview: string;
   hints: string[];
-  solutions: {
-    c: string;
-    cpp: string;
-    python: string;
-  };
+  solution: string;
+  language: 'c' | 'cpp' | 'python';
   explanation: string;
   isRelevant: boolean;
   resources?: {
@@ -28,4 +25,5 @@ export interface Tab {
   activeSession: HintFlowResponse | null;
   visibleHintsCount: number;
   solved: boolean;
+  preferredLanguage: 'c' | 'cpp' | 'python';
 }
