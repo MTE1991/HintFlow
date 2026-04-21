@@ -8,8 +8,25 @@
 
 @layer base {
   body {
-    @apply bg-[#0a0a0a] text-[#e0e0e0] font-mono;
+    @apply bg-[#000000] text-[#00ff41] font-mono overflow-hidden;
   }
+}
+
+.terminal-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.3);
+  border-radius: 3px;
+}
+
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 65, 0.5);
 }
 
 .terminal-glow {

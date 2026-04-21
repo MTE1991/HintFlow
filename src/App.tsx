@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check } from 'lucide-react';
+import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check, X, Plus, MessageSquare, History } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -14,7 +14,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { HintFlowResponse, Message } from './types';
+import { HintFlowResponse, Message, Tab } from './types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,36 +50,65 @@ const markdownComponents = {
   },
 };
 
-const SYSTEM_INSTRUCTION = `You are HintFlow, a Socratic coding tutor for beginner computer science students. 
-Your goal is to help users solve programming problems by providing progressive hints rather than immediate solutions.
+const SYSTEM_INSTRUCTION = `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
 
-IMPORTANT: You MUST provide code solutions in C, C++, and Python.
+### 🛡️ Core Rules
+- **Languages**: You MUST always provide solutions in **C**, **C++**, and **Python**.
+- **Role**: Act as a supportive, expert mentor. Use encouraging but professional language.
+- **Socratic Method**: Do not reveal code logic directly in the initial overview. Use the overview to set the stage and the hints to build the bridge.
 
-RELEVANCE CHECK:
-Before processing, determine if the user's prompt is a programming problem or a request for coding help.
-- If it IS a programming problem: Set "isRelevant" to true and provide the overview, hints, and solutions.
-- If it IS NOT a programming problem (e.g., general chat, life advice, non-coding questions): Set "isRelevant" to false, set "overview" to a polite message explaining that you only help with programming problems, and leave "hints", "solutions", "explanation", and "resources" as empty.
+### 🔍 Relevance Check
+Before any processing, analyze the user's prompt:
+- **IS Coding Problem**: Logic puzzles, algorithm implementation, debugging help, syntax explanations. Set \`"isRelevant": true\`.
+- **IS NOT Coding Problem**: General conversation, recipes, legal advice, or homework that isn't programming-related. Set \`"isRelevant": false\`.
+  - In this case, \`"overview"\` should be a friendly nudge back to programming, and all other fields should be empty/null-equivalents.
 
-When a user provides a programming problem statement:
-1. Provide a high-level overview of the concept.
-2. Provide exactly 3-4 progressive hints. 
-   - Hint 1: High-level conceptual nudge.
-   - Hint 2: Logical structure or algorithm hint.
-   - Hint 3: Specific syntax or implementation detail.
-   - MATH SUPPORT: Use LaTeX syntax for math symbols, formulas, and equations when helpful for clarity (e.g., $O(n^2)$, $\sum_{i=1}^{n} i$, or Big O notation). Use single dollar signs $...$ for inline math and double dollar signs $$...$$ for block equations.
-   - CODE SNIPPETS: Include small code snippets (1-5 lines) in the hints when explaining syntax or structural logic. Wrap them in markdown code blocks.
-3. Provide the full solution in three languages: C, C++, and Python.
-   - FORMATTING: Ensure all code follows industry-standard formatting.
-   - Python: Strictly follow PEP 8 (4-space indentation, snake_case, etc.).
-   - C/C++: Follow standard conventions (consistent indentation, clear variable naming, proper use of include guards/headers).
-   - CLEANLINESS: Do NOT include excessive blank lines or literal escape characters like "\\n\\n" in the code strings. Output clean, ready-to-run code.
-4. Provide a detailed explanation of the logic.
-5. Provide learning resources:
-   - exactly 3 relevant books (include "title" and "author").
-   - exactly 3 relevant websites/webpages (include "name" and "url").
-   - If no relevant books are found for this specific topic, leave the "books" array empty.
+### 🏗️ Content Generation Guidelines
 
-You MUST respond in JSON format matching this schema:
+#### 1. Overview (The "Context")
+Identify the core computer science concepts (e.g., Recursion, Pointer Arithmetic, Time Complexity). Explain *why* this problem is interesting and where it fits in a developer's toolkit. Keep it high-level.
+
+#### 2. Progressive Hints (The "Scaffold")
+Provide between **3 and 5 hints**, each more revealing than the last. Each hint should be 2-4 sentences:
+- **Level 1: The "Mental Model"**: Focus on pure logic, analogies, or the mathematical "why". (e.g., "Think of this like finding a book in a library"). NO CODE.
+- **Level 2: The "Strategy"**: Describe the algorithmic approach at a high level. (e.g., "We can use a 'divide and conquer' strategy here").
+- **Level 3: The "Structural Blueprint"**: Translate the strategy into programming constructs. Mention specific data structures or control flows (loops, branches).
+- **Level 4: The "Tactic/Snippet"**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic. Use one of the 3 supported languages.
+- **Level 5: The "Edge Case Navigator"**: Address subtle pitfalls like null checks, integer overflow, or specific boundary conditions.
+- **Visuals**: Use LaTeX ($...$) for math and markdown code blocks (\`\`\`language) for snippets.
+- **Code Block Integrity**: You MUST ensure every markdown code block is correctly terminated with closing backticks (\`\`\`). Never leave a code block unclosed. Ensure a newline exists after the opening backticks and before the closing backticks for valid syntax highlighting.
+
+### 🛠️ Syntax & String Integrity
+- **JSON Escaping**: Since you are responding in JSON, ensure all double quotes within your strings are properly escaped (\`\"\`). 
+- **Block Formatting**: Do NOT truncate code snippets. If you start a code block in a hint, you MUST finish it.
+- **No Shadow Characters**: Avoid literal string literals like "\\n\\n" visible as text; use actual newline characters within the JSON strings.
+- **Standards**:
+  - **Python**: Strict PEP 8. Use type hints where helpful for clarity.
+  - **C**: C11/C17 standard. Use descriptive variable names. Ensure proper headers. Use \`size_t\` for indices.
+  - **C++**: Modern C++ (17/20). Avoid \`using namespace std\`. Use \`std::vector\` or \`std::string\` over raw arrays when appropriate.
+- **Cleanliness**: No literal escape characters like \`\\n\\n\`. No excessive comments inside code blocks (keep the logic clear).
+
+#### 4. Detailed Explanation (The "Deep Dive")
+Deeply explain the "How" and "Why". 
+- Include **Big O Complexity Analysis** ($O(n)$, $O(1)$, etc.) for Time and Space.
+- Compare how the three languages handle the problem differently (e.g., "Python's brevity vs C's manual control").
+
+#### 5. Learning Resources
+- **Books**: Suggest 3 actual, high-quality textbooks (e.g., "Introduction to Algorithms" by CLRS, "Clean Code", "Effective C++"). Include Title and Author.
+- **Websites**: Suggest 3 authoritative websites (e.g., cppreference.com, python.org, Mozilla Developer Network, GeeksforGeeks).
+
+### 📝 Interaction Modes
+There are two modes of interaction:
+1. **Initial Problem Mode (Hints)**: When a user provides a new coding problem, follow the "Progressive Hints" scaffold.
+2. **Follow-up / Solved Mode**: Once a solution is revealed, the user may ask descriptive questions. In this mode:
+   - Do NOT provide hints.
+   - Provide direct, clear, and descriptive explanations.
+   - Use snippets if they help clarify the follow-up point.
+   - Maintain the same high academic and technical standards for code and theory.
+   - Set "overview" to your direct answer, and leave "hints" as an empty array \`[]\`.
+
+### 📤 Response Format
+You MUST strictly respond in JSON format matching this schema:
 {
   "isRelevant": boolean,
   "overview": "string",
@@ -97,12 +126,22 @@ You MUST respond in JSON format matching this schema:
 }`;
 
 export default function App() {
+  const [tabs, setTabs] = useState<Tab[]>([{
+    id: 'initial',
+    title: 'New Session',
+    messages: [],
+    activeSession: null,
+    visibleHintsCount: 0,
+    solved: false
+  }]);
+  const [activeTabId, setActiveTabId] = useState('initial');
+  
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+  const { messages, activeSession, visibleHintsCount, solved } = activeTab;
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [activeSession, setActiveSession] = useState<HintFlowResponse | null>(null);
-  const [visibleHintsCount, setVisibleHintsCount] = useState(0);
-  const [showSolution, setShowSolution] = useState(false);
+  const [modalData, setModalData] = useState<HintFlowResponse | null>(null);
   const [selectedLang, setSelectedLang] = useState<'c' | 'cpp' | 'python'>('python');
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -113,7 +152,26 @@ export default function App() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, visibleHintsCount, showSolution]);
+  }, [tabs, activeTabId, activeTab.visibleHintsCount, modalData]);
+
+  const updateActiveTab = (updates: Partial<Tab>) => {
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, ...updates } : t));
+  };
+
+  const createNewTab = (initialPrompt?: string) => {
+    const id = Math.random().toString(36).substring(7);
+    const newTab: Tab = {
+      id,
+      title: initialPrompt ? (initialPrompt.length > 20 ? initialPrompt.substring(0, 20) + '...' : initialPrompt) : 'New Session',
+      messages: [],
+      activeSession: null,
+      visibleHintsCount: 0,
+      solved: false
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(id);
+    return id;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,18 +179,56 @@ export default function App() {
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    // If it's a follow-up in a solved tab, we don't create a new tab, just add to existing
+    let currentTabId = activeTabId;
+    let isFollowUp = solved;
+
+    // If active tab has no messages, it's the "New Session" tab being used for the first time
+    if (!solved && messages.length === 0) {
+      updateActiveTab({ 
+        title: userMessage.length > 20 ? userMessage.substring(0, 20) + '...' : userMessage,
+        messages: [{ role: 'user', content: userMessage }]
+      });
+    } else if (!solved) {
+      // Normal progression logic - though usually each new top-level problem should be a new tab
+      // However, if it's the SAME problem being discussed, stay in tab.
+      // THE REQUIREMENT says "For every prompt, make a new tab". I'll interpret "prompt" as "top-level problem statement".
+      // If messages.length > 0 and NOT solved, user might be asking a clarifying question about hints.
+      // But let's follow the "Every prompt -> new tab" for new problems.
+      currentTabId = createNewTab(userMessage);
+      setTabs(prev => prev.map(t => t.id === currentTabId ? { 
+        ...t, 
+        messages: [{ role: 'user', content: userMessage }] 
+      } : t));
+    } else {
+      // It's SOLVED, so it's a follow-up
+      updateActiveTab({
+        messages: [...messages, { role: 'user', content: userMessage, isFollowUp: true }]
+      });
+    }
+
     setIsLoading(true);
-    setVisibleHintsCount(0);
-    setShowSolution(false);
-    setActiveSession(null);
 
     try {
+      const activeTabState = tabs.find(t => t.id === (isFollowUp ? activeTabId : currentTabId)) || activeTab;
+      
+      // Construct context for the AI
+      const chatHistory = activeTabState.messages.map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+      }));
+
+      // In follow-up mode, we want to explain simply.
+      const customInstruction = isFollowUp 
+        ? "The user has already seen the solution. Please answer their follow-up question descriptively and directly without hints."
+        : SYSTEM_INSTRUCTION;
+
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: userMessage,
         config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: customInstruction,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -188,18 +284,36 @@ export default function App() {
       });
 
       const data = JSON.parse(response.text || '{}') as HintFlowResponse;
-      setActiveSession(data);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.overview,
-        data: data
-      }]);
+      
+      setTabs(prev => prev.map(t => {
+        if (t.id === (isFollowUp ? activeTabId : currentTabId)) {
+          return {
+            ...t,
+            activeSession: isFollowUp ? t.activeSession : data,
+            messages: [...t.messages, { 
+              role: 'assistant', 
+              content: data.overview,
+              data: data,
+              isFollowUp
+            }]
+          };
+        }
+        return t;
+      }));
     } catch (error) {
       console.error("Error generating hints:", error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: "I encountered an error while processing your request. Please try again." 
-      }]);
+      setTabs(prev => prev.map(t => {
+        if (t.id === (isFollowUp ? activeTabId : currentTabId)) {
+          return {
+            ...t,
+            messages: [...t.messages, { 
+              role: 'assistant', 
+              content: "I encountered an error while processing your request. Please try again." 
+            }]
+          };
+        }
+        return t;
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -207,15 +321,41 @@ export default function App() {
 
   const revealNextHint = () => {
     if (activeSession && visibleHintsCount < activeSession.hints.length) {
-      setVisibleHintsCount(prev => prev + 1);
+      updateActiveTab({ visibleHintsCount: visibleHintsCount + 1 });
+    }
+  };
+
+  const markAsSolved = (data: HintFlowResponse) => {
+    setModalData(data);
+    updateActiveTab({ solved: true });
+  };
+
+  const closeTab = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (tabs.length === 1) {
+      reset();
+      return;
+    }
+    
+    const newTabs = tabs.filter(t => t.id !== id);
+    setTabs(newTabs);
+    
+    if (activeTabId === id) {
+      setActiveTabId(newTabs[newTabs.length - 1].id);
     }
   };
 
   const reset = () => {
-    setMessages([]);
-    setActiveSession(null);
-    setVisibleHintsCount(0);
-    setShowSolution(false);
+    setTabs([{
+      id: 'initial',
+      title: 'New Session',
+      messages: [],
+      activeSession: null,
+      visibleHintsCount: 0,
+      solved: false
+    }]);
+    setActiveTabId('initial');
+    setModalData(null);
     setInput('');
   };
 
@@ -232,324 +372,363 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
-      {/* Header */}
-      <header className="w-full max-w-4xl mb-8 flex items-center justify-between border-b border-green-500/20 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-500/10 rounded-lg terminal-border">
-            <Terminal className="w-6 h-6 text-green-500" />
+    <div className="min-h-screen flex items-center justify-center p-0 md:p-4 lg:p-8 bg-black overflow-hidden font-mono antialiased">
+      {/* Terminal Window */}
+      <div className="w-full h-full max-w-6xl md:h-[90vh] flex flex-col bg-[#0c0c0c] md:border md:border-[#333] shadow-2xl relative overflow-hidden md:rounded-lg">
+        
+        {/* Title Bar - More compact on mobile */}
+        <div className="flex items-center justify-between px-3 py-2 md:px-4 bg-[#2d2d2d] border-b border-[#333] shrink-0">
+          <div className="flex items-center gap-3 md:gap-6 overflow-hidden">
+            <div className="hidden md:flex gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+              <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+              <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+            </div>
+            <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold text-zinc-400 truncate">
+              <Terminal className="w-3 md:w-3.5 h-3 md:h-3.5 shrink-0" />
+              <span className="truncate">hintflow — user — 80x24</span>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tighter text-green-500 terminal-glow">HintFlow</h1>
-            <p className="text-xs text-green-500/60 uppercase tracking-widest">Socratic Coding Agent v1.0</p>
+          <div className="flex items-center gap-2">
+             <button 
+                onClick={reset}
+                className="text-zinc-500 hover:text-red-500 transition-colors p-1"
+                title="Reset Terminal"
+              >
+                <RefreshCcw className="w-3.5 h-3.5" />
+              </button>
           </div>
         </div>
-        <button 
-          onClick={reset}
-          className="p-2 hover:bg-green-500/10 rounded-full transition-colors text-green-500/60 hover:text-green-500"
-          title="Reset Session"
-        >
-          <RefreshCcw className="w-5 h-5" />
-        </button>
-      </header>
 
-      {/* Main Content */}
-      <main className="w-full max-w-4xl flex-1 flex flex-col gap-6 overflow-hidden">
-        {/* Chat Area */}
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-green-500/20"
-        >
-          {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-40">
-              <Info className="w-12 h-12 text-green-500" />
-              <div className="max-w-md">
-                <p className="text-lg">Paste a problem statement to begin.</p>
-                <p className="text-sm">HintFlow will guide you through the logic without giving away the answer immediately.</p>
-              </div>
-            </div>
-          )}
-
-          {messages.map((msg, idx) => (
-            <div key={idx} className={cn(
-              "flex flex-col gap-2",
-              msg.role === 'user' ? "items-end" : "items-start"
-            )}>
-              <div className={cn(
-                "max-w-[85%] p-4 rounded-xl text-sm leading-relaxed",
-                msg.role === 'user' 
-                  ? "bg-green-500/10 border border-green-500/20 text-green-400" 
-                  : "bg-zinc-900 border border-zinc-800 text-zinc-300"
-              )}>
-                <div className="flex items-center gap-2 mb-2 opacity-50 text-[10px] uppercase tracking-wider font-bold">
-                  {msg.role === 'user' ? 'Student' : 'HintFlow'}
-                </div>
-                <div className="prose prose-invert prose-sm max-w-none">
-                  <Markdown 
-                    remarkPlugins={[remarkMath]} 
-                    rehypePlugins={[rehypeKatex]}
-                    components={markdownComponents}
-                  >
-                    {msg.content}
-                  </Markdown>
-                </div>
-              </div>
-
-              {/* Progressive Hints UI */}
-              {msg.data && msg.data.isRelevant && (
-                <div className="w-full mt-4 space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-green-500/60 uppercase tracking-widest mb-2">
-                    <Lightbulb className="w-3 h-3" />
-                    Progressive Hints
-                  </div>
-                  
-                  <div className="grid gap-3">
-                    {msg.data.hints.slice(0, visibleHintsCount).map((hint, hIdx) => (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        key={hIdx}
-                        className="p-4 bg-zinc-900/50 border border-green-500/20 rounded-lg text-sm flex gap-3"
-                      >
-                        <span className="text-green-500 font-bold shrink-0">0{hIdx + 1}.</span>
-                        <div className="prose prose-invert prose-sm">
-                          <Markdown 
-                            remarkPlugins={[remarkMath]} 
-                            rehypePlugins={[rehypeKatex]}
-                            components={markdownComponents}
-                          >
-                            {hint}
-                          </Markdown>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {visibleHintsCount < msg.data.hints.length && (
-                    <button
-                      onClick={revealNextHint}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-500 text-xs font-bold hover:bg-green-500/20 transition-all"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                      Reveal Next Hint ({visibleHintsCount}/{msg.data.hints.length})
-                    </button>
-                  )}
-
-                  {visibleHintsCount === msg.data.hints.length && !showSolution && (
-                    <button
-                      onClick={() => setShowSolution(true)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs font-bold hover:bg-amber-500/20 transition-all"
-                    >
-                      <Code className="w-4 h-4" />
-                      Reveal Full Solution
-                    </button>
-                  )}
-
-                  {showSolution && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="space-y-4"
-                    >
-                      <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col">
-                        {/* Editor Header */}
-                        <div className="flex items-center justify-between px-4 py-2 bg-zinc-800/50 border-b border-zinc-800">
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-1.5">
-                              <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40" />
-                              <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/40" />
-                              <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/40" />
-                            </div>
-                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                              <Code className="w-3 h-3" />
-                              solution.{selectedLang === 'cpp' ? 'cpp' : selectedLang}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center bg-black/40 rounded p-0.5 border border-zinc-700/50">
-                              {(['c', 'cpp', 'python'] as const).map((lang) => (
-                                <button
-                                  key={lang}
-                                  onClick={() => setSelectedLang(lang)}
-                                  className={cn(
-                                    "px-2 py-0.5 text-[9px] font-bold rounded uppercase transition-all",
-                                    selectedLang === lang 
-                                      ? "bg-amber-500/20 text-amber-500" 
-                                      : "text-zinc-600 hover:text-zinc-400"
-                                  )}
-                                >
-                                  {lang === 'cpp' ? 'C++' : lang}
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                              onClick={() => handleCopy(cleanCode(msg.data.solutions[selectedLang]))}
-                              className="p-1 hover:bg-zinc-700 rounded transition-colors text-zinc-500 hover:text-zinc-300 relative group"
-                              title="Copy Code"
-                            >
-                              <AnimatePresence mode="wait">
-                                {copied ? (
-                                  <motion.div
-                                    key="check"
-                                    initial={{ scale: 0.5, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.5, opacity: 0 }}
-                                  >
-                                    <Check className="w-3.5 h-3.5 text-green-500" />
-                                  </motion.div>
-                                ) : (
-                                  <motion.div
-                                    key="copy"
-                                    initial={{ scale: 0.5, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 0.5, opacity: 0 }}
-                                  >
-                                    <Copy className="w-3.5 h-3.5" />
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Editor Content */}
-                        <div className="text-xs bg-black/20">
-                          <SyntaxHighlighter
-                            language={selectedLang === 'python' ? 'python' : 'cpp'}
-                            style={vscDarkPlus}
-                            showLineNumbers={true}
-                            lineNumberStyle={{ minWidth: '3em', paddingRight: '1.5em', color: '#374151', textAlign: 'right', userSelect: 'none' }}
-                            customStyle={{ 
-                              margin: 0, 
-                              background: 'transparent',
-                              padding: '1.5rem',
-                              lineHeight: '1.7',
-                              fontFamily: '"Fira Code", monospace'
-                            }}
-                          >
-                            {cleanCode(msg.data.solutions[selectedLang])}
-                          </SyntaxHighlighter>
-                        </div>
-
-                        {/* Editor Footer / Status Bar */}
-                        <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-800/30 border-t border-zinc-800 text-[9px] font-mono text-zinc-600">
-                          <div className="flex items-center gap-4">
-                            <span>Ln {cleanCode(msg.data.solutions[selectedLang]).split('\n').length}, Col 1</span>
-                            <span>UTF-8</span>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="flex items-center gap-1">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green-500/40" />
-                              Ready
-                            </span>
-                            <span className="uppercase">{selectedLang === 'cpp' ? 'C++' : selectedLang === 'c' ? 'C' : 'Python 3'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg text-sm italic text-zinc-400">
-                        <Markdown 
-                          remarkPlugins={[remarkMath]} 
-                          rehypePlugins={[rehypeKatex]}
-                          components={markdownComponents}
-                        >
-                          {msg.data.explanation}
-                        </Markdown>
-                      </div>
-
-                      {msg.data.resources && (
-                        <div className="pt-4 border-t border-zinc-800/50 space-y-6">
-                          {/* Books Section */}
-                          {msg.data.resources.books.length > 0 && (
-                            <div>
-                              <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
-                                <BookOpen className="w-3 h-3 text-amber-500/60" />
-                                Recommended Books
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {msg.data.resources.books.map((book, bIdx) => (
-                                  <div
-                                    key={bIdx}
-                                    className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg flex flex-col justify-between"
-                                  >
-                                    <span className="text-xs font-bold text-zinc-300 leading-tight mb-1">{book.title}</span>
-                                    <span className="text-[10px] text-zinc-500 italic">— {book.author}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Websites Section */}
-                          {msg.data.resources.websites.length > 0 && (
-                            <div>
-                              <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
-                                <Globe className="w-3 h-3 text-green-500/60" />
-                                Online Resources
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {msg.data.resources.websites.map((res, rIdx) => (
-                                  <a
-                                    key={rIdx}
-                                    href={res.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:border-green-500/30 transition-all group"
-                                  >
-                                    <span className="text-xs text-zinc-400 group-hover:text-green-400 transition-colors line-clamp-1">{res.name}</span>
-                                    <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:text-green-500" />
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </div>
+        {/* Tab Bar (Tmux style) */}
+        <div className="flex items-center bg-[#1a1a1a] px-2 py-1 shrink-0 gap-1 overflow-x-auto no-scrollbar">
+           {tabs.map((tab, idx) => (
+            <div
+              key={tab.id}
+              className={cn(
+                "group/tab flex items-center gap-2 px-3 py-1 text-[10px] font-bold cursor-pointer transition-colors border-r border-[#333]/30",
+                activeTabId === tab.id 
+                  ? "bg-[#00ff41] text-black" 
+                  : "text-[#00ff41]/50 hover:bg-[#252525]"
               )}
+              onClick={() => setActiveTabId(tab.id)}
+            >
+              <span>{idx}: {tab.title}</span>
+              {tab.solved && <span className="text-[8px]">●</span>}
+              <button
+                onClick={(e) => closeTab(e, tab.id)}
+                className={cn(
+                  "opacity-0 group-hover/tab:opacity-100 hover:text-red-500 transition-opacity",
+                  activeTabId === tab.id && "opacity-60 text-black hover:text-red-900"
+                )}
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
             </div>
           ))}
-
-          {isLoading && (
-            <div className="flex items-center gap-3 text-green-500/50 text-xs font-bold animate-pulse">
-              <Terminal className="w-4 h-4" />
-              Processing problem statement...
-            </div>
-          )}
+          <button 
+            onClick={() => createNewTab()}
+            className="px-3 py-1 text-[10px] font-bold text-[#00ff41]/30 hover:text-[#00ff41] transition-colors"
+          >
+            [+]
+          </button>
         </div>
 
-        {/* Input Area */}
-        <form 
-          onSubmit={handleSubmit}
-          className="relative mt-auto"
-        >
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-green-500/50">
-            <ChevronRight className="w-5 h-5" />
-          </div>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your coding problem here..."
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-4 pl-12 pr-16 text-sm focus:outline-none focus:border-green-500/50 transition-colors placeholder:text-zinc-600"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-green-500 text-black rounded-lg hover:bg-green-400 disabled:opacity-50 disabled:hover:bg-green-500 transition-all"
+        {/* Terminal Content */}
+        <main className="flex-1 flex flex-col overflow-hidden p-4 md:p-6 relative">
+          {/* Scrollable Output */}
+          <div 
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto space-y-6 terminal-scroll md:pr-4"
           >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
-      </main>
+            {messages.length === 0 && (
+              <div className="space-y-4 opacity-80 text-xs md:text-sm">
+                <div className="text-[#00ff41]">
+                  <p>HintFlow OS v1.2.0 (tty1)</p>
+                  <p>Login successful: user@hintflow</p>
+                  <p className="hidden md:block">Last login: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-zinc-500 leading-relaxed max-w-xl">
+                    Welcome to <span className="text-[#00ff41] font-bold italic">HintFlow</span>. I am a Socratic tutor optimized for C, C++, and Python.
+                  </p>
+                  <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest mt-4">
+                    SYSTEM: Listening for problem statement at stdin...
+                  </p>
+                </div>
+              </div>
+            )}
 
-      {/* Footer */}
-      <footer className="mt-8 text-[10px] text-zinc-600 uppercase tracking-[0.2em] font-bold">
-        HintFlow // Built for Beginners // No Spoilers
-      </footer>
+            {messages.map((msg, idx) => (
+              <div key={idx} className="space-y-3">
+                {/* Prompt Line */}
+                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                  <div className="flex items-center gap-2 text-[10px] md:text-xs">
+                    <span className={cn(
+                      "font-bold shrink-0",
+                      msg.role === 'user' ? "text-[#00ff41]" : "text-amber-500"
+                    )}>
+                      [{msg.role === 'user' ? 'student' : 'mentor'}@hintflow]$
+                    </span>
+                    <span className="text-zinc-600 text-[9px] md:text-[10px] uppercase font-bold tracking-tighter shrink-0">
+                      {msg.isFollowUp ? "# follow-up" : "# core"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Message Content */}
+                <div className={cn(
+                   "pl-3 md:pl-6 border-l border-zinc-800/50 py-1",
+                   msg.role === 'assistant' && "text-zinc-200"
+                )}>
+                  <div className="prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-[#00ff41] prose-code:bg-transparent prose-code:p-0 text-[12px] md:text-sm">
+                    <Markdown 
+                      remarkPlugins={[remarkMath]} 
+                      rehypePlugins={[rehypeKatex]}
+                      components={markdownComponents}
+                    >
+                      {msg.content}
+                    </Markdown>
+                  </div>
+                </div>
+
+                {/* Hints / Solution UI */}
+                {msg.data && msg.data.isRelevant && !msg.isFollowUp && (
+                  <div className="pl-3 md:pl-6 mt-4 space-y-6">
+                    <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-bold text-[#00ff41]/40 uppercase tracking-widest border-t border-zinc-900 pt-4">
+                       &gt;&gt; LEARNING_PATH
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {msg.data.hints.slice(0, visibleHintsCount).map((hint, hIdx) => (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          key={hIdx}
+                          className="flex gap-2 md:gap-4"
+                        >
+                          <span className="text-[#00ff41]/30 shrink-0 select-none text-[10px] md:text-sm">H0{hIdx + 1}:</span>
+                          <div className="prose prose-invert prose-xs leading-relaxed text-zinc-400 text-[11px] md:text-sm">
+                            <Markdown 
+                              remarkPlugins={[remarkMath]} 
+                              rehypePlugins={[rehypeKatex]}
+                              components={markdownComponents}
+                            >
+                              {hint}
+                            </Markdown>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-3 md:gap-6">
+                      {visibleHintsCount < msg.data.hints.length && (
+                        <button
+                          onClick={revealNextHint}
+                          className="text-[10px] md:text-[11px] font-bold text-[#00ff41] hover:underline uppercase tracking-widest text-left"
+                        >
+                          [ REVEAL_HINT ({visibleHintsCount}/{msg.data.hints.length}) ]
+                        </button>
+                      )}
+
+                      {visibleHintsCount === msg.data.hints.length && (
+                        <button
+                          onClick={() => markAsSolved(msg.data!)}
+                          className="text-[10px] md:text-[11px] font-bold text-amber-500 hover:underline uppercase tracking-widest text-left"
+                        >
+                          [ SHOW_SOLUTION ]
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex items-center gap-4 text-[#00ff41]/60 text-[10px] font-bold animate-pulse pl-2">
+                <span>_</span>
+                <span>SYSTEM: THINKING...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Prompt Area */}
+          <div className="mt-auto pt-4 md:pt-6 border-t border-[#333]/50">
+             {solved && (
+              <div className="text-[9px] md:text-[10px] text-amber-500/60 uppercase tracking-widest mb-2 italic">
+                # Follow-up enabled. Ask questions about the implementation.
+              </div>
+            )}
+            <form 
+              onSubmit={handleSubmit}
+              className="flex flex-col md:flex-row md:items-start gap-1 md:gap-2 group"
+            >
+              <div className="text-[#00ff41] shrink-0 md:py-1 text-[10px] md:text-sm font-bold opacity-60 md:opacity-100">
+                 student@hintflow %
+              </div>
+              <textarea
+                rows={1}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder={solved ? "ASK_DESC..." : "INPUT_PROBLEM..."}
+                className="flex-1 bg-transparent border-none text-[#00ff41] placeholder:text-[#00ff41]/20 focus:outline-none resize-none overflow-hidden max-h-40 py-1 text-[13px] md:text-sm"
+                disabled={isLoading}
+                autoFocus
+              />
+            </form>
+          </div>
+        </main>
+      </div>
+
+      {/* Solution Modal (Terminal Styled) */}
+      <AnimatePresence>
+        {modalData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-8 lg:p-16 bg-black/95 md:bg-black/90 backdrop-blur-sm uppercase-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="w-full h-full max-w-6xl md:rounded-lg bg-[#0c0c0c] border border-[#333]/50 md:border-[#333] flex flex-col shadow-2xl relative overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-[#1a1a1a] border-b border-[#333] shrink-0">
+                 <div className="flex items-center gap-2 md:gap-3">
+                    <span className="text-[#00ff41] font-bold text-[10px] md:text-xs tracking-widest italic truncate">_VIEW: SOLUTION.LOG</span>
+                 </div>
+                 <button
+                  onClick={() => setModalData(null)}
+                  className="text-zinc-600 hover:text-[#00ff41] transition-colors font-bold text-[10px] md:text-xs p-1"
+                >
+                  [ CLOSE ]
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 terminal-scroll">
+                <div className="bg-black/40 border border-[#222] rounded overflow-hidden">
+                  {/* Editor Header */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between px-3 py-2 bg-[#111] border-b border-[#222] gap-3">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                        SRC: solution.{selectedLang === 'cpp' ? 'cpp' : selectedLang}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between md:justify-end gap-6 overflow-x-auto">
+                      <div className="flex items-center gap-3 md:gap-4 shrink-0">
+                        {(['c', 'cpp', 'python'] as const).map((lang) => (
+                          <button
+                            key={lang}
+                            onClick={() => setSelectedLang(lang)}
+                            className={cn(
+                              "text-[8px] md:text-[9px] font-bold uppercase tracking-widest transition-all",
+                              selectedLang === lang 
+                                ? "text-amber-500 border-b border-amber-500" 
+                                : "text-zinc-600 hover:text-zinc-400"
+                            )}
+                          >
+                            {lang === 'cpp' ? 'C++' : lang}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handleCopy(cleanCode(modalData.solutions[selectedLang]))}
+                        className="text-zinc-500 hover:text-[#00ff41] transition-colors shrink-0"
+                        title="COPY"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Editor Content */}
+                  <div className="text-[10px] md:text-xs overflow-x-auto">
+                    <SyntaxHighlighter
+                      language={selectedLang === 'python' ? 'python' : 'cpp'}
+                      style={vscDarkPlus}
+                      showLineNumbers={true}
+                      lineNumberStyle={{ minWidth: '3em', paddingRight: '1rem', color: '#222', textAlign: 'right', userSelect: 'none' }}
+                      customStyle={{ 
+                        margin: 0, 
+                        background: 'transparent',
+                        padding: '1rem md:1.5rem',
+                        lineHeight: '1.6',
+                        fontFamily: '"Fira Code", monospace'
+                      }}
+                    >
+                      {cleanCode(modalData.solutions[selectedLang])}
+                    </SyntaxHighlighter>
+                  </div>
+                </div>
+
+                <div className="space-y-4 md:space-y-6">
+                  <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41]/60 uppercase tracking-widest">
+                     HOW_IT_WORKS.MD
+                  </div>
+                  <div className="prose prose-invert prose-xs max-w-none text-zinc-400 text-[11px] md:text-sm">
+                    <Markdown 
+                      remarkPlugins={[remarkMath]} 
+                      rehypePlugins={[rehypeKatex]}
+                      components={markdownComponents}
+                    >
+                      {modalData.explanation}
+                    </Markdown>
+                  </div>
+                </div>
+
+                {modalData.resources && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8 border-t border-[#222]">
+                    <div className="space-y-4 md:space-y-6">
+                      <div className="text-[9px] md:text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">
+                        RESOURCES:BOOKS
+                      </div>
+                      <div className="space-y-3">
+                        {modalData.resources.books.slice(0, 3).map((book, bIdx) => (
+                          <div key={bIdx} className="space-y-1">
+                            <p className="text-[11px] md:text-xs font-bold text-zinc-300">{book.title}</p>
+                            <p className="text-[10px] text-zinc-600">— {book.author}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 md:space-y-6">
+                      <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41]/60 uppercase tracking-widest">
+                        RESOURCES:WEB
+                      </div>
+                      <div className="space-y-3 md:space-y-4">
+                        {modalData.resources.websites.slice(0, 3).map((res, rIdx) => (
+                          <a
+                            key={rIdx}
+                            href={res.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block group"
+                          >
+                            <p className="text-[11px] md:text-xs text-zinc-400 group-hover:text-[#00ff41] transition-colors truncate">{res.name}</p>
+                            <p className="text-[9px] text-zinc-700 truncate">{res.url}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -2,20 +2,22 @@
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and beginners. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive hints, helping them develop problem-solving skills and a deeper understanding of coding logic.
 
-<!-- ![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600) -->
+![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
 
 ## ✨ Features
 
+- **Unix Terminal Aesthetic**: A professionally crafted, high-contrast UI inspired by classic shell environments and `tmux` multiplexers, using **Fira Code** for all typography.
+- **Dynamic Tab System**: Manage multiple coding challenges simultaneously with a session-aware tab bar. Each problem lives in its own "terminal tab".
+- **Follow-up Interaction**: Ask descriptive questions after a solution is revealed. HintFlow switches from Socratic hints to expert implementation dialogue once the core logic is understood.
 - **Socratic Tutoring**: Provides high-level overviews and conceptual nudges before showing code.
-- **Progressive Hints**: Reveal 3-4 hints one by one, from conceptual logic to specific syntax details, now including **helpful code snippets** for clearer implementation cues.
-- **Multi-Language Support**: Provides solutions in C, C++, and Python, allowing students to compare implementations across different paradigms.
-- **Academic Standards**: All code solutions follow professional formatting standards (PEP 8 for Python; standard C/C++ conventions) to encourage best practices from day one.
-- **Code Editor View**: Full solutions are displayed in a professional, multi-line code editor with syntax highlighting, line numbers, and a language toggle.
-- **Recommended Resources**: Automatically suggests relevant books (title and author) and online resources (name and URL) to help users expand their knowledge after seeing the solution.
-- **Relevance Filtering**: Intelligently identifies and filters out non-programming prompts to stay focused on coding education.
-- **Terminal Aesthetic**: A clean, dark-themed UI inspired by classic developer environments.
-- **Math Support**: Full LaTeX support for mathematical symbols and equations using KaTeX, perfect for algorithm complexity and data science problems.
-- **No Spoilers**: Solutions are hidden behind a "Reveal" button to prevent accidental spoilers.
+- **Progressive Hints**: Reveal 3-5 hints one by one, scaling from conceptual logic to specific language syntax.
+- **Multi-Language Support**: Provides industrial-grade solutions in C, C++, and Python.
+- **Mobile Responsive**: Fully optimized for mobile shell experiences, providing a productive environment on any device.
+- **Academic Standards**: All code solutions follow professional formatting standards to encourage best practices.
+- **Code Editor View**: Full solutions are displayed with syntax highlighting, line numbers, and language toggles.
+- **Recommended Resources**: Automatically suggests relevant books and online documentation for deep-dive learning.
+- **Math Support**: Full LaTeX support for algorithmic complexity and data science expressions using KaTeX.
+- **No Spoilers**: Solutions and hints are hidden behind intentional disclosure triggers.
 
 ## 🛠️ Tech Stack
 
@@ -68,69 +70,66 @@ The app will be available at `http://localhost:3000`.
 
 ## 📖 How to Use
 
-1. **Enter a Problem**: Paste a coding problem statement (e.g., "Write a function to check if a number is prime").
-   - *Note: HintFlow will filter out prompts that are not related to programming.*
-2. **Read the Overview**: HintFlow will provide a conceptual explanation of the problem.
-3. **Reveal Hints**: Click "Reveal Next Hint" to get progressive clues about the logic and syntax.
-4. **Solve It**: Try to write the code yourself based on the hints!
-5. **Check the Solution**: If you're stuck or want to compare your work, click "Reveal Full Solution" to see the Python implementation and a detailed explanation.
+1. **Enter a Problem**: Type your challenge at the `[student@hintflow %]` prompt.
+2. **Review Terminal Output**: HintFlow will output a conceptual breakdown and "Learning Path".
+3. **Reveal Clues**: Use the `[ REVEAL_HINT ]` command triggers to see progressive layers of logic.
+4. **Inspect Solution**: Execute `[ SHOW_SOLUTION ]` to view the full industrial-grade implementations.
+5. **Ask Follow-ups**: Once solved, type further questions to get expert-level implementation advice.
+6. **Manage Sessions**: Use the top tab bar to switch between different problem shells or start a `[+]` new one.
 
 ## 🧠 Under the Hood
 
 ### System Architecture
 ```mermaid
 graph TB
-    subgraph Client [Client Side - React Application]
-        UI[User Interface - Terminal Theme]
-        Input[Problem Input Field]
-        State[React State Management<br/>'messages', 'activeSession', 'visibleHintsCount']
+    subgraph Client [Client Side - Terminal Shell]
+        UI[Shell UI - monospaced / CRT-ready]
+        Tabs[Session Manager - Tmux Style]
+        State[React Multi-Tab State Management]
         
-        subgraph Rendering [Rendering Engine]
-            Markdown[React Markdown Renderer]
-            Syntax[Prism Syntax Highlighter<br/>'vscDarkPlus' theme]
+        subgraph Rendering [Display Drivers]
+            Markdown[Markdown/KaTeX Parser]
+            Highlighter[Prism Engine - vscDarkPlus]
         end
     end
 
-    subgraph API [External Services]
-        Gemini[Google Gemini 3.1 Pro API]
-        Env[Environment Variables<br/>'GEMINI_API_KEY']
+    subgraph API [Neural Engine]
+        Gemini[Google Gemini 3.1 Pro]
+        ENV[Auth: GEMINI_API_KEY]
     end
 
-    subgraph Logic [AI Reasoning & Socratic Logic]
-        SysInst[System Instruction<br/>'Socratic Tutor Role']
-        Schema[JSON Response Schema Enforcement]
+    subgraph Logic [Teacher Core]
+        ModeCheck{Solved?}
+        Socratic[Socratic Path Driver]
+        Expert[Expert Implementation Consultant]
         
-        subgraph Pipeline [Processing Pipeline]
-            RelCheck{Relevance Check}
-            GenHints[Generate 3-4 Progressive Hints]
-            GenSol[Generate solutions in C/C++/Python]
-            Reject[Polite Rejection Message]
+        subgraph Pipeline [Output Buffering]
+            GenHints[Layered Hint Generation]
+            GenSol[Tri-Language Implementation]
+            Resources[Knowledge Graph Retrieval]
         end
     end
 
-    Input -->|Submit| State
-    State -->|API Call| Gemini
-    Env --> Gemini
-    Gemini -->|Process| SysInst
-    SysInst --> RelCheck
-    RelCheck -->|Yes: Learning Mode| GenHints
-    RelCheck -->|No: Off-topic| Reject
-    GenHints --> GenSol
-    GenSol --> Schema
-    Reject --> Schema
-    Schema -->|Structured JSON| State
+    Tabs -->|Active Buffer| UI
+    UI -->|Input| State
+    State -->|Session History| Gemini
+    Gemini --> ModeCheck
+    ModeCheck -->|No| Socratic
+    ModeCheck -->|Yes| Expert
+    Socratic --> Pipeline
+    Pipeline -->|JSON Schema| State
     State --> Rendering
     Rendering --> UI
-    UI -->|Reveal Hint/Solution| State
 ```
 
 ### Socratic Prompting Strategy
-HintFlow uses a specialized **System Instruction** to guide the Gemini 3.1 Pro model. Instead of a standard chat interface, the model is instructed to act as a "Socratic Tutor." It follows a strict multi-step reasoning process:
-1. **Relevance Check**: The model first evaluates if the input is a programming problem.
-2. **Conceptual Overview**: It identifies the core CS concepts involved (e.g., recursion, data structures).
-3. **Hint Generation**: It creates 3-4 hints that progressively move from abstract logic to specific implementation details.
-5. **Solution Guarding**: It provides full, well-formatted solutions in C, C++, and Python, along with a deep-dive explanation.
-6. **Curated Resources**: It identifies 3 relevant books and 3 high-authority online resources for continued learning. If no relevant books are found, it only provides online resources.
+HintFlow uses a specialized **System Instruction** to guide the Gemini 3.1 Pro model. Instead of a standard chat interface, the model is instructed to act as a "Socratic Tutor" focusing on "Guided Discovery". It follows a rigorous multi-step reasoning process:
+1. **Relevance Check**: Evaluates if the input is a programming problem or general off-topic conversation and handles non-coding prompts with a polite redirection.
+2. **Pedagogical Overview**: Identifies core CS concepts and explains the problem's context without revealing the solution.
+3. **Structured Scaffolding**: Generates exactly 3-4 hints that transition from abstract logic to algorithmic structure, and finally to implementation-specific syntax.
+4. **Professional Multi-Language Implementations**: Provides production-grade code in C (C11/17), C++ (C++17/20), and Python (PEP 8) with modern standards.
+5. **Logic Deep Dive**: Analyzes the "How" and "Why", including **Big O Time and Space Complexity** analysis.
+6. **Academic Resources**: Curates a list of top-tier textbooks (Title/Author) and authoritative websites for further study.
 
 ### Structured Data Flow
 To ensure the UI remains consistent, HintFlow leverages **JSON Schema** enforcement. The Gemini API returns a structured object:

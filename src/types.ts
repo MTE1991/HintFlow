@@ -18,4 +18,14 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   data?: HintFlowResponse;
+  isFollowUp?: boolean;
+}
+
+export interface Tab {
+  id: string;
+  title: string;
+  messages: Message[];
+  activeSession: HintFlowResponse | null;
+  visibleHintsCount: number;
+  solved: boolean;
 }
