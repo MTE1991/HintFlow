@@ -50,12 +50,12 @@ const markdownComponents = {
   },
 };
 
-const SYSTEM_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
+const HINTS_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
 
 ### 🛡️ Core Rules
-- **Language**: You MUST provide the final solution in **${lang}**.
-- **Role**: Act as a supportive, expert mentor. Use encouraging but professional language.
-- **Socratic Method**: Do not reveal code logic directly in the initial overview. Use the overview to set the stage and the hints to build the bridge.
+- **Method**: You are currently in **HINT_MODE**. You MUST only provide a conceptual overview and progressive hints. 
+- **NO FULL SOLUTIONS**: Do not provide the final full code implementation in this mode.
+- **Goal**: Help the student understand the logic so they can try to write the code themselves.
 
 ### 🔍 Relevance Check
 Before any processing, analyze the user's prompt:
@@ -66,60 +66,69 @@ Before any processing, analyze the user's prompt:
 ### 🏗️ Content Generation Guidelines
 
 #### 1. Overview (The "Context")
-Identify the core computer science concepts (e.g., Recursion, Pointer Arithmetic, Time Complexity). Explain *why* this problem is interesting and where it fits in a developer's toolkit. Keep it high-level.
+Identify the core computer science concepts. Explain *why* this problem is interesting and where it fits in a developer's toolkit. Keep it high-level. Do NOT mention specific implementation details yet.
 
 #### 2. Progressive Hints (The "Scaffold")
-Provide between **3 and 5 hints**, each more revealing than the last. Each hint should be 2-4 sentences:
-- **Level 1: The "Mental Model"**: Focus on pure logic, analogies, or the mathematical "why". (e.g., "Think of this like finding a book in a library"). NO CODE.
-- **Level 2: The "Strategy"**: Describe the algorithmic approach at a high level. (e.g., "We can use a 'divide and conquer' strategy here").
-- **Level 3: The "Structural Blueprint"**: Translate the strategy into programming constructs. Mention specific data structures or control flows (loops, branches).
-- **Level 4: The "Tactic/Snippet"**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic. Use ${lang}.
-- **Level 5: The "Edge Case Navigator"**: Address subtle pitfalls like null checks, integer overflow, or specific boundary conditions.
-- **Visuals**: Use LaTeX ($...$) for math and markdown code blocks (\`\`\`language) for snippets.
-- **Code Block Integrity**: You MUST ensure every markdown code block is correctly terminated with closing backticks (\`\`\`). Never leave a code block unclosed. Ensure a newline exists after the opening backticks and before the closing backticks for valid syntax highlighting.
-
-### 🛠️ Syntax & String Integrity
-- **JSON Escaping**: Since you are responding in JSON, ensure all double quotes within your strings are properly escaped (\`\"\`). 
-- **Block Formatting**: Do NOT truncate code snippets. If you start a code block in a hint, you MUST finish it.
-- **No Shadow Characters**: Avoid literal string literals like "\\n\\n" visible as text; use actual newline characters within the JSON strings.
-- **Standards**:
-  - **Python**: Strict PEP 8. Use type hints where helpful for clarity.
-  - **C**: C11/C17 standard. Use descriptive variable names. Ensure proper headers. Use \`size_t\` for indices.
-  - **C++**: Modern C++ (17/20). Avoid \`using namespace std\`. Use \`std::vector\` or \`std::string\` over raw arrays when appropriate.
-- **Cleanliness**: No literal escape characters like \`\\n\\n\`. No excessive comments inside code blocks (keep the logic clear).
-
-#### 4. Detailed Explanation (The "Deep Dive")
-Deeply explain the "How" and "Why". 
-- Include **Big O Complexity Analysis** ($O(n)$, $O(1)$, etc.) for Time and Space.
-- Focus specifically on how ${lang} features are used to solve this efficiently.
-
-#### 5. Learning Resources
-- **Books**: Suggest 3 actual, high-quality textbooks (e.g., "Introduction to Algorithms" by CLRS, "Clean Code", "Effective C++"). Include Title and Author.
-- **Websites**: Suggest 3 authoritative websites (e.g., cppreference.com, python.org, Mozilla Developer Network, GeeksforGeeks).
-
-### 📝 Interaction Modes
-There are two modes of interaction:
-1. **Initial Problem Mode (Hints)**: When a user provides a new coding problem, follow the "Progressive Hints" scaffold.
-2. **Follow-up / Solved Mode**: Once a solution is revealed, the user may ask descriptive questions. In this mode:
-   - Do NOT provide hints.
-   - Provide direct, clear, and descriptive explanations.
-   - Use snippets if they help clarify the follow-up point.
-   - Maintain the same high academic and technical standards for code and theory.
-   - Set "overview" to your direct answer, and leave "hints" as an empty array \`[]\`.
+Provide between **3 and 5 hints**, each more revealing than the last:
+- **Level 1**: Pure logic, analogies, or the mathematical "why". NO CODE.
+- **Level 2**: High-level algorithmic strategy (e.g. "binary search").
+- **Level 3**: Programming constructs/data structures to use.
+- **Level 4**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic using ${lang}.
+- **Level 5**: Address edge cases or pitfalls.
 
 ### 📤 Response Format
-You MUST strictly respond in JSON format matching this schema:
+Respond ONLY with this JSON structure:
 {
   "isRelevant": boolean,
   "overview": "string",
-  "hints": ["string", "string", "string"],
-  "solution": "string (the full code implementation in ${lang})",
+  "hints": ["string", "string", "string"]
+}`;
+
+const SOLUTION_INSTRUCTION = (lang: string) => `You are **HintFlow**, an **Expert Implementation Consultant**.
+The user has been working through hints for a coding problem and is now ready to see the final professional implementation in **${lang}**.
+
+### 🏗️ Content Generation Guidelines
+
+#### 1. Full Solution
+Provide a production-grade, clean implementation in ${lang}.
+- **Python**: PEP 8 standards.
+- **C**: C11/C17, proper headers, descriptive names.
+- **C++**: Modern C++17/20, std::vector/string, no namespace std.
+
+#### 2. Detailed Explanation (The "Deep Dive")
+Deeply explain the "How" and "Why":
+- Include **Big O Complexity Analysis** ($O(n)$, $O(1)$, etc.) for Time and Space.
+- Focus on how ${lang} features were utilized.
+
+#### 3. Learning Resources
+- **Books**: Suggest 3 actual textbooks (Title and Author).
+- **Websites**: Suggest 3 authoritative websites.
+
+### 📤 Response Format
+Respond ONLY with this JSON structure:
+{
+  "solution": "string (the full code implementation)",
   "language": "${lang}",
   "explanation": "string",
   "resources": {
     "books": [{ "title": "string", "author": "string" }],
     "websites": [{ "name": "string", "url": "string" }]
   }
+}`;
+
+const FOLLOWUP_INSTRUCTION = (lang: string) => `You are **HintFlow**, an **Expert Implementation Consultant**.
+The user has already seen the solution in ${lang}. 
+Please answer their follow-up question with high technical depth. 
+- Provide **comprehensive, multi-paragraph, and high-depth technical explanations**. 
+- Dive deep into the mechanics, performance, and best practices.
+- Use complex snippets in ${lang} if they help clarify the point. 
+- Maintain high academic and technical standards.
+
+### 📤 Response Format
+Respond with this JSON structure:
+{
+  "overview": "your direct answer (multi-paragraph string)",
+  "hints": []
 }`;
 
 export default function App() {
@@ -139,6 +148,7 @@ export default function App() {
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSolutionLoading, setIsSolutionLoading] = useState(false);
   const [modalData, setModalData] = useState<HintFlowResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -217,10 +227,31 @@ export default function App() {
         parts: [{ text: m.content }]
       }));
 
-      // In follow-up mode, we want to explain simply.
       const customInstruction = isFollowUp 
-        ? `The user has already seen the solution in ${activeTabState.preferredLanguage}. Please answer their follow-up question descriptively and directly without hints. Use ${activeTabState.preferredLanguage} for any code snippets.`
-        : SYSTEM_INSTRUCTION(activeTabState.preferredLanguage);
+        ? FOLLOWUP_INSTRUCTION(activeTabState.preferredLanguage)
+        : HINTS_INSTRUCTION(activeTabState.preferredLanguage);
+
+      const responseSchemaPhase1 = {
+        type: Type.OBJECT,
+        properties: {
+          isRelevant: { type: Type.BOOLEAN },
+          overview: { type: Type.STRING },
+          hints: { 
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["isRelevant", "overview", "hints"]
+      };
+
+      const responseSchemaFollowUp = {
+        type: Type.OBJECT,
+        properties: {
+          overview: { type: Type.STRING },
+          hints: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["overview", "hints"]
+      };
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -228,49 +259,7 @@ export default function App() {
         config: {
           systemInstruction: customInstruction,
           responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              isRelevant: { type: Type.BOOLEAN },
-              overview: { type: Type.STRING },
-              hints: { 
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
-              solution: { type: Type.STRING },
-              language: { type: Type.STRING },
-              explanation: { type: Type.STRING },
-              resources: {
-                type: Type.OBJECT,
-                properties: {
-                  books: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        title: { type: Type.STRING },
-                        author: { type: Type.STRING }
-                      },
-                      required: ["title", "author"]
-                    }
-                  },
-                  websites: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        name: { type: Type.STRING },
-                        url: { type: Type.STRING }
-                      },
-                      required: ["name", "url"]
-                    }
-                  }
-                },
-                required: ["books", "websites"]
-              }
-            },
-            required: ["isRelevant", "overview", "hints", "solution", "language", "explanation", "resources"]
-          }
+          responseSchema: isFollowUp ? responseSchemaFollowUp : responseSchemaPhase1
         },
       });
 
@@ -316,9 +305,83 @@ export default function App() {
     }
   };
 
-  const markAsSolved = (data: HintFlowResponse) => {
-    setModalData(data);
-    updateActiveTab({ solved: true });
+  const markAsSolved = async (data: HintFlowResponse) => {
+    // If we already have the solution (rare case now), just show it
+    if (data.solution) {
+      setModalData(data);
+      updateActiveTab({ solved: true });
+      return;
+    }
+
+    setIsSolutionLoading(true);
+    try {
+      const problemStatement = activeTab.messages.length > 0 ? activeTab.messages[0].content : '';
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Provide the full solution for this coding problem: ${problemStatement}`,
+        config: {
+          systemInstruction: SOLUTION_INSTRUCTION(activeTab.preferredLanguage),
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              solution: { type: Type.STRING },
+              language: { type: Type.STRING },
+              explanation: { type: Type.STRING },
+              resources: {
+                type: Type.OBJECT,
+                properties: {
+                  books: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        title: { type: Type.STRING },
+                        author: { type: Type.STRING }
+                      },
+                      required: ["title", "author"]
+                    }
+                  },
+                  websites: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        name: { type: Type.STRING },
+                        url: { type: Type.STRING }
+                      },
+                      required: ["name", "url"]
+                    }
+                  }
+                },
+                required: ["books", "websites"]
+              }
+            },
+            required: ["solution", "language", "explanation", "resources"]
+          }
+        },
+      });
+
+      const solutionData = JSON.parse(response.text || '{}');
+      const fullResponse: HintFlowResponse = {
+        ...data,
+        ...solutionData
+      };
+
+      setTabs(prev => prev.map(t => t.id === activeTabId ? {
+        ...t,
+        activeSession: fullResponse,
+        solved: true,
+        messages: t.messages.map(m => m.data === data ? { ...m, data: fullResponse } : m)
+      } : t));
+      
+      setModalData(fullResponse);
+    } catch (error) {
+      console.error("Error generating solution:", error);
+    } finally {
+      setIsSolutionLoading(false);
+    }
   };
 
   const closeTab = (e: React.MouseEvent, id: string) => {
@@ -526,9 +589,13 @@ export default function App() {
                       {visibleHintsCount === msg.data.hints.length && (
                         <button
                           onClick={() => markAsSolved(msg.data!)}
-                          className="text-[10px] md:text-[11px] font-bold text-amber-500 hover:underline uppercase tracking-widest text-left"
+                          disabled={isSolutionLoading}
+                          className={cn(
+                            "text-[10px] md:text-[11px] font-bold text-amber-500 hover:underline uppercase tracking-widest text-left",
+                            isSolutionLoading && "opacity-50 cursor-wait"
+                          )}
                         >
-                          [ SHOW_SOLUTION ]
+                          {isSolutionLoading ? "[ SYTEM: COMPILING_SOLUTION... ]" : "[ SHOW_SOLUTION ]"}
                         </button>
                       )}
                     </div>

@@ -1,9 +1,9 @@
 export interface HintFlowResponse {
   overview: string;
   hints: string[];
-  solution: string;
-  language: 'c' | 'cpp' | 'python';
-  explanation: string;
+  solution?: string;
+  language?: 'c' | 'cpp' | 'python';
+  explanation?: string;
   isRelevant: boolean;
   resources?: {
     books: { title: string; author: string }[];
