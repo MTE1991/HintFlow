@@ -81,45 +81,18 @@ The app will be available at `http://localhost:3000`.
 
 ### System Architecture
 ```mermaid
-graph TB
-    subgraph Client [Client Side - Terminal Shell]
-        UI[Shell UI - monospaced / CRT-ready]
-        Tabs[Session Manager - Tmux Style]
-        State[React Multi-Tab State Management]
-        
-        subgraph Rendering [Display Drivers]
-            Markdown[Markdown/KaTeX Parser]
-            Highlighter[Prism Engine - vscDarkPlus]
-        end
+graph LR
+    User([User]) --> Terminal[Terminal Shell]
+    Terminal --> State[Session Manager]
+    State <--> AI[Neural Engine]
+    
+    subgraph Logic [Instructional Core]
+        AI --> Socratic[Socratic Tutoring Mode]
+        AI --> Expert[Technical Implementation Mode]
     end
-
-    subgraph API [Neural Engine]
-        Gemini[Google Gemini 3.1 Pro]
-        ENV[Auth: GEMINI_API_KEY]
-    end
-
-    subgraph Logic [Teacher Core]
-        ModeCheck{Solved?}
-        Socratic[Socratic Path Driver]
-        Expert[Expert Implementation Consultant]
-        
-        subgraph Pipeline [Output Buffering]
-            GenHints[Layered Hint Generation]
-            GenSol[Tri-Language Implementation]
-            Resources[Knowledge Graph Retrieval]
-        end
-    end
-
-    Tabs -->|Active Buffer| UI
-    UI -->|Input| State
-    State -->|Session History| Gemini
-    Gemini --> ModeCheck
-    ModeCheck -->|No| Socratic
-    ModeCheck -->|Yes| Expert
-    Socratic --> Pipeline
-    Pipeline -->|JSON Schema| State
-    State --> Rendering
-    Rendering --> UI
+    
+    Logic --> Rendering[Dynamic Display Engine]
+    Rendering --> Terminal
 ```
 
 ### Socratic Prompting Strategy
