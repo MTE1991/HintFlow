@@ -15,6 +15,7 @@
 - **Expert Post-Mortem**: Once solved, HintFlow transitions into **Expert Implementation Mode**, providing high-depth technical analysis of memory management, performance trade-offs, and first-principles mechanics.
 - **Complexity Analysis Card**: Dedicated UI for mandatory $O(n)$ Time and Space complexity metrics.
 - **Common Pitfalls**: Identifies frequent student bugs and edge cases specific to the problem.
+- **Download Research Logs**: Integrated one-click JSON export of the entire session (all tabs, messages, and AI-extracted metadata) for academic analysis and performance tracking.
 
 ## 🛠️ Tech Stack
 
@@ -50,6 +51,16 @@ npm run dev
 ```
 The app will be available at `http://localhost:3000`.
 
+## 📖 Interactive Workflow
+
+1. **Language Selection**: Select **Python**, **C++**, or **C** at the bottom of the terminal before starting. This optimizes the AI's internal reasoning for that specific syntax.
+2. **Input Challenge**: Type your problem statement at the `student@hintflow %` prompt.
+3. **Analyze Scaffolding**: Review the **Big Idea** and work through the progressive hints.
+4. **Solve Reflection**: Answer the `THINK_ABOUT_THIS` reflective question before unveiling the solution.
+5. **Code Inspection**: Fetch the full solution. Use the **Complexity Analysis** card to understand $O(n)$ performance metrics.
+6. **Expert Follow-up**: Ask descriptive questions for a deep-dive post-mortem analysis.
+7. **Export Logs**: Click the download icon to save the session metadata for your research.
+
 ## 🧠 Under the Hood
 
 ### System Architecture
@@ -80,6 +91,15 @@ To support technical publications and quantifiable analysis, every AI response i
 - **`topic_tags`**: For domain difficulty analysis.
 - **`difficulty_score` (1-10)**: Quantifies the cognitive load of a given problem.
 - **`technical_depth_score` (1-5)**: Measures the complexity of expert follow-up responses.
+
+#### 📊 Data Export (Research Logs)
+The `[ DOWNLOAD_LOGS ]` button (invoked via the download icon) exports the full session state as a structured JSON file. This includes:
+- **Global Metadata**: Device-agnostic timestamps and session identifiers.
+- **Transcript Data**: Every user prompt vs. AI response sequence.
+- **Extracted Metrics**: All cognitive load scores and topic tags for each interaction.
+- **Complexity Analysis**: Captured Time/Space complexity data for solutions.
+
+Researchers can ingest these JSON logs into Python (Pandas/Matplotlib) or R for large-scale analysis of student learning curves and AI pedagogical efficacy.
 
 ### Structured Response Schema
 HintFlow leverages **STRICT JSON** enforcement to ensure the React frontend remains robust. The schema evolves based on the active phase:

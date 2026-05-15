@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check, X, Plus, MessageSquare, History } from 'lucide-react';
+import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check, X, Plus, MessageSquare, History, Download } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -418,6 +418,17 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const downloadResearchLogs = () => {
+    // Assuming 'tabs' contains your session data and metadata
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tabs, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `hintflow_research_logs_${new Date().toISOString()}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
   const cleanCode = (code: string) => {
     return code
       .trim()
@@ -443,6 +454,14 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+             <button 
+                onClick={downloadResearchLogs}
+                className="text-zinc-500 hover:text-[#00ff41] transition-colors p-1"
+                title="Download Research Logs"
+                disabled={messages.length === 0}
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
              <button 
                 onClick={reset}
                 className="text-zinc-500 hover:text-red-500 transition-colors p-1"
