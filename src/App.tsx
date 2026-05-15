@@ -50,84 +50,69 @@ const markdownComponents = {
   },
 };
 
-const HINTS_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic coding tutor for beginner and intermediate computer science students. Your mission is to facilitate "Guided Discovery" — helping students build mental models of programming concepts rather than just providing answers.
+const HINTS_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic tutor. 
+Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizing "Desirable Difficulty."
 
 ### 🛡️ Core Rules
-- **Method**: You are currently in **HINT_MODE**. You MUST only provide a conceptual overview and progressive hints. 
-- **NO FULL SOLUTIONS**: Do not provide the final full code implementation in this mode.
-- **Goal**: Help the student understand the logic so they can try to write the code themselves.
+- **Method**: HINT_MODE. Focus on "Guided Discovery."
+- **NO FULL SOLUTIONS**: Do not provide the final implementation.
+- **Adaptive Scaffolding**: If the user provided code, analyze their specific logic error and tailor Hint 1-2 to that specific mistake.
 
-### 🔍 Relevance Check
-Before any processing, analyze the user's prompt:
-- **IS Coding Problem**: Logic puzzles, algorithm implementation, debugging help, syntax explanations. Set \`"isRelevant": true\`.
-- **IS NOT Coding Problem**: General conversation, recipes, legal advice, or homework that isn't programming-related. Set \`"isRelevant": false\`.
-  - In this case, \`"overview"\` should be a friendly nudge back to programming, and all other fields should be empty/null-equivalents.
+### 🏗️ Content Generation
+1. **Overview**: Explain the "Big Idea" (e.g., "Divide and Conquer").
+2. **Progressive Hints**: 
+   - **Level 1**: Conceptual analogy.
+   - **Level 2**: Algorithmic strategy (Pseudocode logic).
+   - **Level 3**: Specific ${lang} features/functions to use.
+   - **Level 4**: Minimal code snippet (3-5 lines) of the "bottleneck" logic only.
+3. **Reflective Question**: A single question that asks the user to predict what happens next or why a certain choice is made.
 
-### 🏗️ Content Generation Guidelines
-
-#### 1. Overview (The "Context")
-Identify the core computer science concepts. Explain *why* this problem is interesting and where it fits in a developer's toolkit. Keep it high-level. Do NOT mention specific implementation details yet.
-
-#### 2. Progressive Hints (The "Scaffold")
-Provide between **3 and 5 hints**, each more revealing than the last:
-- **Level 1**: Pure logic, analogies, or the mathematical "why". NO CODE.
-- **Level 2**: High-level algorithmic strategy (e.g. "binary search").
-- **Level 3**: Programming constructs/data structures to use.
-- **Level 4**: Provide a **mandatory 3-5 line code snippet** of the most difficult part of the logic using ${lang}.
-- **Level 5**: Address edge cases or pitfalls.
-
-### 📤 Response Format
-Respond ONLY with this JSON structure:
+### 📤 Response Format (STRICT JSON)
 {
   "isRelevant": boolean,
+  "topic_tags": ["Recursion", "Arrays", etc.],
+  "difficulty_score": 1-10,
   "overview": "string",
-  "hints": ["string", "string", "string"]
+  "hints": ["string", "string", "string"],
+  "reflective_question": "string" 
 }`;
 
-const SOLUTION_INSTRUCTION = (lang: string) => `You are **HintFlow**, an **Expert Implementation Consultant**.
-The user has been working through hints for a coding problem and is now ready to see the final professional implementation in **${lang}**.
+const SOLUTION_INSTRUCTION = (lang: string) => `You are the **HintFlow Expert Implementation Consultant**.
+The user is ready for the "Golden Path" solution.
 
 ### 🏗️ Content Generation Guidelines
-
-#### 1. Full Solution
-Provide a production-grade, clean implementation in ${lang}.
-- **Python**: PEP 8 standards.
-- **C**: C11/C17, proper headers, descriptive names.
-- **C++**: Modern C++17/20, std::vector/string, no namespace std.
-
-#### 2. Detailed Explanation (The "Deep Dive")
-Deeply explain the "How" and "Why":
-- Include **Big O Complexity Analysis** ($O(n)$, $O(1)$, etc.) for Time and Space.
-- Focus on how ${lang} features were utilized.
-
-#### 3. Learning Resources
-- **Books**: Suggest 3 actual textbooks (Title and Author).
-- **Websites**: Suggest 3 authoritative websites.
+1. **Full Solution**: Production-grade, idiomatic ${lang}.
+2. **Deep Dive**: 
+   - Explain the logic clearly.
+   - **Complexity**: Mandatory Time/Space complexity analysis.
+   - **Trade-offs**: Briefly mention one alternative way to solve this (e.g., Iterative vs Recursive) and why this version was chosen.
+3. **Common Pitfalls**: Mention 2 common bugs students make with this specific problem.
 
 ### 📤 Response Format
-Respond ONLY with this JSON structure:
 {
-  "solution": "string (the full code implementation)",
+  "solution": "string",
   "language": "${lang}",
+  "complexity": { "time": "O(?)", "space": "O(?)" },
   "explanation": "string",
+  "pitfalls": ["string", "string"],
   "resources": {
     "books": [{ "title": "string", "author": "string" }],
     "websites": [{ "name": "string", "url": "string" }]
   }
 }`;
 
-const FOLLOWUP_INSTRUCTION = (lang: string) => `You are **HintFlow**, an **Expert Implementation Consultant**.
-The user has already seen the solution in ${lang}. 
-Please answer their follow-up question with high technical depth. 
-- Provide **comprehensive, multi-paragraph, and high-depth technical explanations**. 
-- Dive deep into the mechanics, performance, and best practices.
-- Use complex snippets in ${lang} if they help clarify the point. 
-- Maintain high academic and technical standards.
+const FOLLOWUP_INSTRUCTION = (lang: string) => `You are the **HintFlow Expert Implementation Consultant**. 
+The user has the solution and is now performing a "Post-Mortem" analysis.
+
+### 🏗️ Content Generation Guidelines
+- **Academic Depth**: Use first-principles reasoning to explain "under the hood" mechanics (e.g., Memory management in ${lang}, Stack frames).
+- **Practicality**: Connect the user's question to real-world engineering scenarios.
+- **Format**: Use Markdown for code snippets and bold text for key terms.
 
 ### 📤 Response Format
-Respond with this JSON structure:
 {
-  "overview": "your direct answer (multi-paragraph string)",
+  "overview": "multi-paragraph string",
+  "technical_depth_score": 1-5,
   "hints": []
 }`;
 
@@ -235,22 +220,26 @@ export default function App() {
         type: Type.OBJECT,
         properties: {
           isRelevant: { type: Type.BOOLEAN },
+          topic_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          difficulty_score: { type: Type.NUMBER },
           overview: { type: Type.STRING },
           hints: { 
             type: Type.ARRAY,
             items: { type: Type.STRING }
-          }
+          },
+          reflective_question: { type: Type.STRING }
         },
-        required: ["isRelevant", "overview", "hints"]
+        required: ["isRelevant", "topic_tags", "difficulty_score", "overview", "hints", "reflective_question"]
       };
 
       const responseSchemaFollowUp = {
         type: Type.OBJECT,
         properties: {
           overview: { type: Type.STRING },
+          technical_depth_score: { type: Type.NUMBER },
           hints: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
-        required: ["overview", "hints"]
+        required: ["overview", "technical_depth_score", "hints"]
       };
 
       const response = await ai.models.generateContent({
@@ -328,7 +317,16 @@ export default function App() {
             properties: {
               solution: { type: Type.STRING },
               language: { type: Type.STRING },
+              complexity: {
+                type: Type.OBJECT,
+                properties: {
+                  time: { type: Type.STRING },
+                  space: { type: Type.STRING }
+                },
+                required: ["time", "space"]
+              },
               explanation: { type: Type.STRING },
+              pitfalls: { type: Type.ARRAY, items: { type: Type.STRING } },
               resources: {
                 type: Type.OBJECT,
                 properties: {
@@ -358,7 +356,7 @@ export default function App() {
                 required: ["books", "websites"]
               }
             },
-            required: ["solution", "language", "explanation", "resources"]
+            required: ["solution", "language", "complexity", "explanation", "pitfalls", "resources"]
           }
         },
       });
@@ -528,6 +526,25 @@ export default function App() {
                     <span className="text-zinc-600 text-[9px] md:text-[10px] uppercase font-bold tracking-tighter shrink-0">
                       {msg.isFollowUp ? "# follow-up" : "# core"}
                     </span>
+                    {msg.data?.topic_tags && (
+                      <div className="flex gap-1 overflow-hidden">
+                        {msg.data.topic_tags.map((tag, tIdx) => (
+                          <span key={tIdx} className="text-[8px] md:text-[9px] px-1 bg-zinc-800 text-zinc-500 rounded border border-zinc-700">
+                             {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {msg.data?.difficulty_score && (
+                      <span className="text-[8px] md:text-[9px] text-[#00ff41]/40 px-1 border border-[#00ff41]/20 rounded font-mono">
+                        DIFF: {msg.data.difficulty_score}/10
+                      </span>
+                    )}
+                    {msg.data?.technical_depth_score && (
+                      <span className="text-[8px] md:text-[9px] text-amber-500/40 px-1 border border-amber-500/20 rounded font-mono">
+                        DEPTH: {msg.data.technical_depth_score}/5
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -574,6 +591,21 @@ export default function App() {
                           </div>
                         </motion.div>
                       ))}
+
+                      {visibleHintsCount > 0 && msg.data.reflective_question && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-6 p-3 md:p-4 bg-[#00ff41]/5 border border-[#00ff41]/10 rounded-sm"
+                        >
+                          <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41] uppercase tracking-widest mb-2 flex items-center gap-2">
+                             <MessageSquare className="w-3 h-3" /> THINK_ABOUT_THIS
+                          </div>
+                          <p className="text-[11px] md:text-sm text-[#00ff41]/80 leading-relaxed italic">
+                            {msg.data.reflective_question}
+                          </p>
+                        </motion.div>
+                      )}
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-3 md:gap-6">
@@ -747,6 +779,42 @@ export default function App() {
                       {cleanCode(modalData.solution)}
                     </SyntaxHighlighter>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  {modalData.complexity && (
+                    <div className="space-y-4">
+                      <div className="text-[9px] md:text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">
+                        COMPLEXITY_ANALYSIS
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded">
+                           <p className="text-[8px] uppercase text-zinc-500 mb-1">Time</p>
+                           <code className="text-[#00ff41] font-bold text-sm tracking-widest">{modalData.complexity.time}</code>
+                        </div>
+                        <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded">
+                           <p className="text-[8px] uppercase text-zinc-500 mb-1">Space</p>
+                           <code className="text-[#00ff41] font-bold text-sm tracking-widest">{modalData.complexity.space}</code>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {modalData.pitfalls && modalData.pitfalls.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="text-[9px] md:text-[10px] font-bold text-red-500/60 uppercase tracking-widest">
+                        COMMON_PITFALLS
+                      </div>
+                      <div className="space-y-2">
+                        {modalData.pitfalls.map((pitfall, pIdx) => (
+                          <div key={pIdx} className="flex gap-2 text-[11px] md:text-sm text-zinc-400 italic">
+                             <span className="text-red-500/40">!</span>
+                             <p>{pitfall}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 md:space-y-6">
