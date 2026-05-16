@@ -64,19 +64,48 @@ The app will be available at `http://localhost:3000`.
 ## 🧠 Under the Hood
 
 ### System Architecture
+
 ```mermaid
-graph LR
-    User([User]) --> Terminal[Terminal Shell]
-    Terminal --> State[Session Manager]
-    State <--> AI[Neural Engine]
-    
-    subgraph Execution [Phase-Based Core]
-        AI --> HINTS[Phase 1: Scaffolding]
-        AI --> SOLUTIONS[Phase 2: Deep Dive]
+graph TD
+    subgraph UI [Frontend Layer: React 19]
+        U([User])
+        Terminal[Terminal Shell UI]
+        Tabs[Session Tab Manager]
+        LogExport[Research Log Downloader]
+        
+        U -- Inputs Problem --> Terminal
+        U -- Switch Context --> Tabs
+        LogExport -- Triggers --> Export[.json Logs]
     end
-    
-    Execution --> Rendering[Dynamic Display Engine]
-    Rendering --> Terminal
+
+    subgraph APP [Application Logic]
+        SM[State Manager: Tabs & Messages]
+        PM{Phase Manager}
+        
+        Terminal -- Action --> SM
+        SM -- Request Context --> PM
+    end
+
+    subgraph CORE [Instructional Orchestrator]
+        P1[[Phase 1: Socratic Scaffolding]]
+        P2[[Phase 2: Expert Implementation]]
+        P3[[Expert Post-Mortem Consultant]]
+        
+        PM -- "New / Hinting" --> P1
+        PM -- "[ SHOW_SOLUTION ]" --> P2
+        PM -- "Follow-up Query" --> P3
+    end
+
+    subgraph LLM [Neural Engine: Gemini 3.1 Pro]
+        G((Gemini API))
+        SJ[Strict JSON Schema Guard]
+        
+        P1 & P2 & P3 -- Adaptive Prompts --> G
+        G -- Parsed Response --> SJ
+    end
+
+    SJ -- "Extracted Metadata & Content" --> SM
+    SM -- Re-render --> Terminal
 ```
 
 ### Instructional Modes
