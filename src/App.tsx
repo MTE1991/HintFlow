@@ -524,7 +524,32 @@ export default function App() {
                   <p className="text-zinc-500 leading-relaxed max-w-xl">
                     Welcome to <span className="text-[#00ff41] font-bold italic">HintFlow</span>. I am a Socratic tutor optimized for C, C++, and Python.
                   </p>
-                  <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest mt-4">
+                  
+                  <div className="mt-6 space-y-4 max-w-2xl bg-zinc-900/30 p-4 border border-zinc-800/50 rounded-sm">
+                    <div className="text-[10px] uppercase font-bold text-[#00ff41]/60 tracking-widest mb-3">
+                      &gt; QUICK_START_GUIDE
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                      <div className="space-y-1">
+                        <p className="text-[#00ff41] font-bold text-[10px]">01 // CONFIGURATION</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Select your target language at the bottom of the shell before starting.</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#00ff41] font-bold text-[10px]">02 // SCAFFOLDING</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Type your problem. I will provide a conceptual roadmap and progressive hints.</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#00ff41] font-bold text-[10px]">03 // ACTIVE LEARNING</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Engage with <strong>THINK_ABOUT_THIS</strong> questions to test your mental models.</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#00ff41] font-bold text-[10px]">04 // POST-MORTEM</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">After seeing the solution, ask "why" or "how" for first-principles engineering analysis.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest mt-6">
                     SYSTEM: Listening for problem statement at stdin...
                   </p>
                 </div>
