@@ -1,10 +1,10 @@
-# HintFlow 🚀
+# HintFlow
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and research analysis. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive scaffolding, high-depth technical analysis, and data-rich interactions.
 
 <!-- ![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600) -->
 
-## ✨ Features
+## Features
 
 - **Unix Terminal Aesthetic**: A professionally crafted, high-contrast UI inspired by classic shell environments and `tmux` multiplexers, using **Fira Code** for all typography.
 - **Selective Language Generation**: Users select a target language (Python, C++, or C) before starting, reducing token overhead by ~65% and drastically improving performance.
@@ -17,7 +17,7 @@
 - **Common Pitfalls**: Identifies frequent student bugs and edge cases specific to the problem.
 - **Download Research Logs**: Integrated one-click JSON export of the entire session (all tabs, messages, and AI-extracted metadata) for academic analysis and performance tracking.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: React 19, TypeScript, Vite
 - **AI Engine**: Google Gemini 3.1 Pro (via `@google/genai`)
@@ -27,7 +27,7 @@
 - **Syntax Highlighting**: React Syntax Highlighter (Prism)
 - **Math Support**: Full LaTeX support for algorithmic expressions using KaTeX.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -51,7 +51,7 @@ npm run dev
 ```
 The app will be available at `http://localhost:3000`.
 
-## 📖 Interactive Workflow
+## Interactive Workflow
 
 1. **Language Selection**: Select **Python**, **C++**, or **C** at the bottom of the terminal before starting. This optimizes the AI's internal reasoning for that specific syntax.
 2. **Input Challenge**: Type your problem statement at the `student@hintflow %` prompt.
@@ -61,7 +61,7 @@ The app will be available at `http://localhost:3000`.
 6. **Expert Follow-up**: Ask descriptive questions for a deep-dive post-mortem analysis.
 7. **Export Logs**: Click the download icon to save the session metadata for your research.
 
-## 🧠 Under the Hood
+## Under the Hood
 
 ### System Architecture
 
