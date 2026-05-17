@@ -2,7 +2,7 @@
 
 **HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and research analysis. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive scaffolding, high-depth technical analysis, and data-rich interactions.
 
-![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600)
+<!-- ![HintFlow UI](https://picsum.photos/seed/hintflow/1200/600) -->
 
 ## ✨ Features
 
