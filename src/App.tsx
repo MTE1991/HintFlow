@@ -65,6 +65,8 @@ Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizin
    - **Level 2**: Algorithmic strategy (Pseudocode logic).
    - **Level 3**: Specific ${lang} features/functions to use.
    - **Level 4**: Minimal code snippet (3-5 lines) of the "bottleneck" logic only.
+     - **MUST be formatted with proper multiple lines and indentation.**
+     - **STRICTLY FORBIDDEN: Semicolons used to merge multiple lines or construct single-line blocks. Spacing must be correct.**
 3. **Reflective Question**: A single question that asks the user to predict what happens next or why a certain choice is made.
 
 ### 📤 Response Format (STRICT JSON)
@@ -82,6 +84,9 @@ The user is ready for the "Golden Path" solution.
 
 ### 🏗️ Content Generation Guidelines
 1. **Full Solution**: Production-grade, idiomatic ${lang}.
+   - **MUST be beautifully formatted with physical newlines (escaped as \\n in JSON) and proper nesting indentation (4 spaces per nesting level for Python).**
+   - **STRICT DIRECTIVE: NEVER compress code logic or multiple statements onto a single line using semicolons (\`;\`). Every statement must be on its own line. Semicolons should never be used as a replacement for newlines.**
+   - Do NOT abbreviate code. Ensure variables have clear, descriptive names.
 2. **Deep Dive**: 
    - Explain the logic clearly.
    - **Complexity**: Mandatory Time/Space complexity analysis.
@@ -430,7 +435,9 @@ export default function App() {
   };
 
   const cleanCode = (code: string) => {
+    if (!code) return '';
     return code
+      .replace(/\\n/g, '\n')
       .trim()
       .replace(/\n{3,}/g, '\n\n');
   };
