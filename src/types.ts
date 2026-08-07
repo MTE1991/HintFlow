@@ -1,3 +1,8 @@
+export interface SolutionCode {
+  language: string;
+  code: string;
+}
+
 export interface HintFlowResponse {
   isRelevant: boolean;
   topic_tags?: string[];
@@ -5,8 +10,9 @@ export interface HintFlowResponse {
   overview: string;
   hints: string[];
   reflective_question?: string;
+  solutions?: SolutionCode[];
   solution?: string;
-  language?: 'c' | 'cpp' | 'python';
+  language?: string;
   complexity?: { time: string; space: string };
   explanation?: string;
   pitfalls?: string[];
@@ -31,5 +37,5 @@ export interface Tab {
   activeSession: HintFlowResponse | null;
   visibleHintsCount: number;
   solved: boolean;
-  preferredLanguage: 'c' | 'cpp' | 'python';
 }
+

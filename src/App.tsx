@@ -5,7 +5,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Terminal, Send, ChevronRight, Lightbulb, Code, RefreshCcw, Info, CheckCircle2, BookOpen, Globe, Copy, Check, X, Plus, MessageSquare, History, Download } from 'lucide-react';
+import { 
+  Terminal, RefreshCcw, Copy, Check, X, 
+  MessageSquare, Download, HelpCircle, HardDrive
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -14,7 +17,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { HintFlowResponse, Message, Tab } from './types';
+import { HintFlowResponse, Tab } from './types';
+import { WelcomeScreen } from './components/WelcomeScreen';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -50,7 +54,7 @@ const markdownComponents = {
   },
 };
 
-const HINTS_INSTRUCTION = (lang: string) => `You are **HintFlow**, a specialized Socratic tutor. 
+const HINTS_INSTRUCTION = `You are **HintFlow**, a specialized Socratic tutor. 
 Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizing "Desirable Difficulty."
 
 ### 🛡️ Core Rules
@@ -63,7 +67,7 @@ Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizin
 2. **Progressive Hints**: 
    - **Level 1**: Conceptual analogy.
    - **Level 2**: Algorithmic strategy (Pseudocode logic).
-   - **Level 3**: Specific ${lang} features/functions to use.
+   - **Level 3**: Programming concepts or data structure features to use.
    - **Level 4**: Minimal code snippet (3-5 lines) of the "bottleneck" logic only.
      - **MUST be formatted with proper multiple lines and indentation.**
      - **STRICTLY FORBIDDEN: Semicolons used to merge multiple lines or construct single-line blocks. Spacing must be correct.**
@@ -79,24 +83,42 @@ Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizin
   "reflective_question": "string" 
 }`;
 
-const SOLUTION_INSTRUCTION = (lang: string) => `You are the **HintFlow Expert Implementation Consultant**.
+const SOLUTION_INSTRUCTION = `You are the **HintFlow Expert Implementation Consultant**.
 The user is ready for the "Golden Path" solution.
 
 ### 🏗️ Content Generation Guidelines
-1. **Full Solution**: Production-grade, idiomatic ${lang}.
+1. **Language Selection Rules**:
+   - **IF THE USER EXPLICITLY ASKED FOR SPECIFIC PROGRAMMING LANGUAGE(S)** in their prompt or conversation (e.g. "in Java", "using Rust", "in Go", "in Python", "in C++", "in TypeScript", etc.): Provide full, production-grade, idiomatic solution(s) in the \`solutions\` array ONLY for the requested language(s). Set the \`language\` property of each solution object to the lowercase language name (e.g., "java", "rust", "go", "python", "cpp", "c", "javascript", "typescript", etc.).
+   - **IF NO SPECIFIC LANGUAGE WAS EXPLICITLY REQUESTED BY THE USER**: You MUST generate full, production-grade, idiomatic solutions in ALL THREE default languages: C, C++, and Python in the \`solutions\` array (with language values "c", "cpp", "python").
+
+2. **Code Formatting Requirements**:
    - **MUST be beautifully formatted with physical newlines (escaped as \\n in JSON) and proper nesting indentation (4 spaces per nesting level for Python).**
    - **STRICT DIRECTIVE: NEVER compress code logic or multiple statements onto a single line using semicolons (\`;\`). Every statement must be on its own line. Semicolons should never be used as a replacement for newlines.**
    - Do NOT abbreviate code. Ensure variables have clear, descriptive names.
-2. **Deep Dive**: 
+
+3. **Deep Dive & Complexity**:
    - Explain the logic clearly.
    - **Complexity**: Mandatory Time/Space complexity analysis.
    - **Trade-offs**: Briefly mention one alternative way to solve this (e.g., Iterative vs Recursive) and why this version was chosen.
-3. **Common Pitfalls**: Mention 2 common bugs students make with this specific problem.
 
-### 📤 Response Format
+4. **Common Pitfalls**: Mention 2 common bugs students make with this specific problem.
+
+### 📤 Response Format (STRICT JSON)
 {
-  "solution": "string",
-  "language": "${lang}",
+  "solutions": [
+    {
+      "language": "python",
+      "code": "string"
+    },
+    {
+      "language": "cpp",
+      "code": "string"
+    },
+    {
+      "language": "c",
+      "code": "string"
+    }
+  ],
   "complexity": { "time": "O(?)", "space": "O(?)" },
   "explanation": "string",
   "pitfalls": ["string", "string"],
@@ -106,11 +128,11 @@ The user is ready for the "Golden Path" solution.
   }
 }`;
 
-const FOLLOWUP_INSTRUCTION = (lang: string) => `You are the **HintFlow Expert Implementation Consultant**. 
+const FOLLOWUP_INSTRUCTION = `You are the **HintFlow Expert Implementation Consultant**. 
 The user has the solution and is now performing a "Post-Mortem" analysis.
 
 ### 🏗️ Content Generation Guidelines
-- **Academic Depth**: Use first-principles reasoning to explain "under the hood" mechanics (e.g., Memory management in ${lang}, Stack frames).
+- **Academic Depth**: Use first-principles reasoning to explain "under the hood" mechanics (e.g., Memory management, Stack frames, Compiler optimizations).
 - **Practicality**: Connect the user's question to real-world engineering scenarios.
 - **Format**: Use Markdown for code snippets and bold text for key terms.
 
@@ -121,35 +143,116 @@ The user has the solution and is now performing a "Post-Mortem" analysis.
   "hints": []
 }`;
 
-export default function App() {
-  const [tabs, setTabs] = useState<Tab[]>([{
+const SESSIONS_STORAGE_KEY = 'hintflow_sessions_v1';
+const ACTIVE_TAB_STORAGE_KEY = 'hintflow_active_tab_v1';
+const SHOW_WELCOME_STORAGE_KEY = 'hintflow_show_welcome_v1';
+
+const getInitialTabs = (): Tab[] => {
+  try {
+    const saved = localStorage.getItem(SESSIONS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load sessions from local storage", err);
+  }
+  return [{
     id: 'initial',
     title: 'New Session',
     messages: [],
     activeSession: null,
     visibleHintsCount: 0,
-    solved: false,
-    preferredLanguage: 'python'
-  }]);
-  const [activeTabId, setActiveTabId] = useState('initial');
-  
-  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
-  const { messages, activeSession, visibleHintsCount, solved, preferredLanguage } = activeTab;
+    solved: false
+  }];
+};
+
+const getInitialActiveTabId = (initialTabs: Tab[]): string => {
+  try {
+    const saved = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    if (saved && initialTabs.some(t => t.id === saved)) {
+      return saved;
+    }
+  } catch (err) {
+    console.error("Failed to load active tab from local storage", err);
+  }
+  return initialTabs[0]?.id || 'initial';
+};
+
+const getInitialShowWelcome = (): boolean => {
+  try {
+    const saved = localStorage.getItem(SHOW_WELCOME_STORAGE_KEY);
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+  } catch (err) {
+    console.error("Failed to load welcome preference from local storage", err);
+  }
+  return true;
+};
+
+export default function App() {
+  const [tabs, setTabs] = useState<Tab[]>(getInitialTabs);
+  const [activeTabId, setActiveTabId] = useState<string>(() => {
+    const initialTabs = getInitialTabs();
+    return getInitialActiveTabId(initialTabs);
+  });
+
+  const [showWelcomeOnStart, setShowWelcomeOnStart] = useState<boolean>(getInitialShowWelcome);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(showWelcomeOnStart);
+
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0] || {
+    id: 'initial',
+    title: 'New Session',
+    messages: [],
+    activeSession: null,
+    visibleHintsCount: 0,
+    solved: false
+  };
+  const { messages, activeSession, visibleHintsCount, solved } = activeTab;
 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSolutionLoading, setIsSolutionLoading] = useState(false);
   const [modalData, setModalData] = useState<HintFlowResponse | null>(null);
+  const [activeSolutionLangIdx, setActiveSolutionLangIdx] = useState(0);
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
+  // Persistence Effects
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(tabs));
+    } catch (err) {
+      console.error("Failed to save sessions to local storage", err);
+    }
+  }, [tabs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTabId);
+    } catch (err) {
+      console.error("Failed to save active tab to local storage", err);
+    }
+  }, [activeTabId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHOW_WELCOME_STORAGE_KEY, JSON.stringify(showWelcomeOnStart));
+    } catch (err) {
+      console.error("Failed to save welcome preference to local storage", err);
+    }
+  }, [showWelcomeOnStart]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [tabs, activeTabId, activeTab.visibleHintsCount, modalData]);
+  }, [tabs, activeTabId, activeTab?.visibleHintsCount, modalData]);
 
   const updateActiveTab = (updates: Partial<Tab>) => {
     setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, ...updates } : t));
@@ -163,63 +266,46 @@ export default function App() {
       messages: [],
       activeSession: null,
       visibleHintsCount: 0,
-      solved: false,
-      preferredLanguage: activeTab.preferredLanguage
+      solved: false
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(id);
     return id;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const processUserPrompt = async (userMessageText: string, targetTabId?: string) => {
+    const userMessage = userMessageText.trim();
+    if (!userMessage || isLoading) return;
 
-    const userMessage = input.trim();
-    setInput('');
+    let currentTabId = targetTabId || activeTabId;
+    const currentTab = tabs.find(t => t.id === currentTabId) || activeTab;
+    let isFollowUp = currentTab.solved;
 
-    // If it's a follow-up in a solved tab, we don't create a new tab, just add to existing
-    let currentTabId = activeTabId;
-    let isFollowUp = solved;
-
-    // If active tab has no messages, it's the "New Session" tab being used for the first time
-    if (!solved && messages.length === 0) {
-      updateActiveTab({ 
+    if (!currentTab.solved && currentTab.messages.length === 0) {
+      setTabs(prev => prev.map(t => t.id === currentTabId ? { 
+        ...t, 
         title: userMessage.length > 20 ? userMessage.substring(0, 20) + '...' : userMessage,
         messages: [{ role: 'user', content: userMessage }]
-      });
-    } else if (!solved) {
-      // Normal progression logic - though usually each new top-level problem should be a new tab
-      // However, if it's the SAME problem being discussed, stay in tab.
-      // THE REQUIREMENT says "For every prompt, make a new tab". I'll interpret "prompt" as "top-level problem statement".
-      // If messages.length > 0 and NOT solved, user might be asking a clarifying question about hints.
-      // But let's follow the "Every prompt -> new tab" for new problems.
+      } : t));
+    } else if (!currentTab.solved) {
       currentTabId = createNewTab(userMessage);
       setTabs(prev => prev.map(t => t.id === currentTabId ? { 
         ...t, 
         messages: [{ role: 'user', content: userMessage }] 
       } : t));
     } else {
-      // It's SOLVED, so it's a follow-up
-      updateActiveTab({
-        messages: [...messages, { role: 'user', content: userMessage, isFollowUp: true }]
-      });
+      setTabs(prev => prev.map(t => t.id === currentTabId ? { 
+        ...t, 
+        messages: [...t.messages, { role: 'user', content: userMessage, isFollowUp: true }]
+      } : t));
     }
 
     setIsLoading(true);
 
     try {
-      const activeTabState = tabs.find(t => t.id === (isFollowUp ? activeTabId : currentTabId)) || activeTab;
-      
-      // Construct context for the AI
-      const chatHistory = activeTabState.messages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }]
-      }));
-
       const customInstruction = isFollowUp 
-        ? FOLLOWUP_INSTRUCTION(activeTabState.preferredLanguage)
-        : HINTS_INSTRUCTION(activeTabState.preferredLanguage);
+        ? FOLLOWUP_INSTRUCTION
+        : HINTS_INSTRUCTION;
 
       const responseSchemaPhase1 = {
         type: Type.OBJECT,
@@ -260,7 +346,7 @@ export default function App() {
       const data = JSON.parse(response.text || '{}') as HintFlowResponse;
       
       setTabs(prev => prev.map(t => {
-        if (t.id === (isFollowUp ? activeTabId : currentTabId)) {
+        if (t.id === currentTabId) {
           return {
             ...t,
             activeSession: isFollowUp ? t.activeSession : data,
@@ -277,7 +363,7 @@ export default function App() {
     } catch (error) {
       console.error("Error generating hints:", error);
       setTabs(prev => prev.map(t => {
-        if (t.id === (isFollowUp ? activeTabId : currentTabId)) {
+        if (t.id === currentTabId) {
           return {
             ...t,
             messages: [...t.messages, { 
@@ -293,6 +379,21 @@ export default function App() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    const msg = input.trim();
+    setInput('');
+    await processUserPrompt(msg);
+  };
+
+  const handleWelcomeStart = (samplePrompt?: string) => {
+    setIsWelcomeModalOpen(false);
+    if (samplePrompt) {
+      processUserPrompt(samplePrompt);
+    }
+  };
+
   const revealNextHint = () => {
     if (activeSession && visibleHintsCount < activeSession.hints.length) {
       updateActiveTab({ visibleHintsCount: visibleHintsCount + 1 });
@@ -300,9 +401,9 @@ export default function App() {
   };
 
   const markAsSolved = async (data: HintFlowResponse) => {
-    // If we already have the solution (rare case now), just show it
-    if (data.solution) {
+    if (data.solutions && data.solutions.length > 0) {
       setModalData(data);
+      setActiveSolutionLangIdx(0);
       updateActiveTab({ solved: true });
       return;
     }
@@ -313,15 +414,24 @@ export default function App() {
       
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Provide the full solution for this coding problem: ${problemStatement}`,
+        contents: `Provide the full solution for this coding problem: "${problemStatement}". If I explicitly requested a specific programming language in my prompt, provide only that requested language in the solutions array. Otherwise, default to providing solutions for C, C++, and Python in the solutions array.`,
         config: {
-          systemInstruction: SOLUTION_INSTRUCTION(activeTab.preferredLanguage),
+          systemInstruction: SOLUTION_INSTRUCTION,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              solution: { type: Type.STRING },
-              language: { type: Type.STRING },
+              solutions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    language: { type: Type.STRING },
+                    code: { type: Type.STRING }
+                  },
+                  required: ["language", "code"]
+                }
+              },
               complexity: {
                 type: Type.OBJECT,
                 properties: {
@@ -361,7 +471,7 @@ export default function App() {
                 required: ["books", "websites"]
               }
             },
-            required: ["solution", "language", "complexity", "explanation", "pitfalls", "resources"]
+            required: ["solutions", "complexity", "explanation", "pitfalls", "resources"]
           }
         },
       });
@@ -380,6 +490,7 @@ export default function App() {
       } : t));
       
       setModalData(fullResponse);
+      setActiveSolutionLangIdx(0);
     } catch (error) {
       console.error("Error generating solution:", error);
     } finally {
@@ -403,17 +514,18 @@ export default function App() {
   };
 
   const reset = () => {
-    setTabs([{
-      id: 'initial',
+    const freshTab: Tab = {
+      id: 'initial_' + Date.now().toString(36),
       title: 'New Session',
       messages: [],
       activeSession: null,
       visibleHintsCount: 0,
-      solved: false,
-      preferredLanguage: 'python'
-    }]);
-    setActiveTabId('initial');
+      solved: false
+    };
+    setTabs([freshTab]);
+    setActiveTabId(freshTab.id);
     setModalData(null);
+    setActiveSolutionLangIdx(0);
     setInput('');
   };
 
@@ -424,7 +536,6 @@ export default function App() {
   };
 
   const downloadResearchLogs = () => {
-    // Assuming 'tabs' contains your session data and metadata
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tabs, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -442,12 +553,33 @@ export default function App() {
       .replace(/\n{3,}/g, '\n\n');
   };
 
+  // Derive active solutions list for modal
+  const modalSolutions = modalData?.solutions && modalData.solutions.length > 0
+    ? modalData.solutions
+    : modalData?.solution
+      ? [{ language: modalData.language || 'code', code: modalData.solution }]
+      : [];
+
+  const activeSolutionCodeObj = modalSolutions[activeSolutionLangIdx] || modalSolutions[0];
+
   return (
     <div className="h-[100dvh] w-full flex items-center justify-center p-0 md:p-4 lg:p-8 bg-black overflow-hidden font-mono antialiased">
+      {/* Animated Welcome Screen Modal */}
+      <AnimatePresence>
+        {isWelcomeModalOpen && (
+          <WelcomeScreen
+            onStart={handleWelcomeStart}
+            onClose={() => setIsWelcomeModalOpen(false)}
+            showOnStart={showWelcomeOnStart}
+            setShowOnStart={setShowWelcomeOnStart}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Terminal Window */}
       <div className="w-full h-full max-w-6xl md:h-[90vh] flex flex-col bg-[#0c0c0c] md:border md:border-[#333] shadow-2xl relative overflow-hidden md:rounded-lg">
         
-        {/* Title Bar - More compact on mobile */}
+        {/* Title Bar */}
         <div className="flex items-center justify-between px-3 py-2 md:px-4 bg-[#2d2d2d] border-b border-[#333] shrink-0">
           <div className="flex items-center gap-3 md:gap-6 overflow-hidden">
             <div className="hidden md:flex gap-2">
@@ -456,14 +588,24 @@ export default function App() {
               <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
             </div>
             <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold text-zinc-400 truncate">
-              <Terminal className="w-3 md:w-3.5 h-3 md:h-3.5 shrink-0" />
+              <Terminal className="w-3 md:w-3.5 h-3 md:h-3.5 shrink-0 text-[#00ff41]" />
               <span className="truncate">hintflow — user — 80x24</span>
+              <span className="hidden lg:inline-flex items-center gap-1 text-[9px] text-[#00ff41]/80 px-1.5 py-0.2 rounded border border-[#00ff41]/20 font-mono ml-2">
+                <HardDrive className="w-2.5 h-2.5" /> LOCAL_CACHE_ONLINE
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
              <button 
+                onClick={() => setIsWelcomeModalOpen(true)}
+                className="text-zinc-400 hover:text-[#00ff41] transition-colors p-1"
+                title="Open Welcome Screen & Guide"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+             <button 
                 onClick={downloadResearchLogs}
-                className="text-zinc-500 hover:text-[#00ff41] transition-colors p-1"
+                className="text-zinc-400 hover:text-[#00ff41] transition-colors p-1"
                 title="Download Research Logs"
                 disabled={messages.length === 0}
               >
@@ -471,8 +613,8 @@ export default function App() {
               </button>
              <button 
                 onClick={reset}
-                className="text-zinc-500 hover:text-red-500 transition-colors p-1"
-                title="Reset Terminal"
+                className="text-zinc-400 hover:text-red-500 transition-colors p-1"
+                title="Reset Terminal / Clear All Tabs"
               >
                 <RefreshCcw className="w-3.5 h-3.5" />
               </button>
@@ -508,6 +650,7 @@ export default function App() {
           <button 
             onClick={() => createNewTab()}
             className="px-3 py-1 text-[10px] font-bold text-[#00ff41]/30 hover:text-[#00ff41] transition-colors"
+            title="Create New Session Tab"
           >
             [+]
           </button>
@@ -523,31 +666,32 @@ export default function App() {
             {messages.length === 0 && (
               <div className="space-y-4 opacity-80 text-xs md:text-sm">
                 <div className="text-[#00ff41]">
-                  <p>HintFlow OS v1.2.0 (tty1)</p>
+                  <p>HintFlow OS v1.3.0 (tty1)</p>
                   <p>Login successful: user@hintflow</p>
                   <p className="hidden md:block">Last login: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-zinc-500 leading-relaxed max-w-xl">
-                    Welcome to <span className="text-[#00ff41] font-bold italic">HintFlow</span>. I am a Socratic tutor optimized for C, C++, and Python.
+                    Welcome to <span className="text-[#00ff41] font-bold italic">HintFlow</span>. I am a Socratic tutor for problem solving & engineering.
                   </p>
                   
                   <div className="mt-6 space-y-4 max-w-2xl bg-zinc-900/30 p-4 border border-zinc-800/50 rounded-sm">
-                    <div className="text-[10px] uppercase font-bold text-[#00ff41]/60 tracking-widest mb-3">
-                      &gt; QUICK_START_GUIDE
+                    <div className="text-[10px] uppercase font-bold text-[#00ff41]/60 tracking-widest mb-3 flex items-center justify-between">
+                      <span>&gt; QUICK_START_GUIDE</span>
+                      <span className="text-[9px] text-[#00ff41]/40 font-normal">SESSIONS PERSISTED IN LOCAL CACHE</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                       <div className="space-y-1">
-                        <p className="text-[#00ff41] font-bold text-[10px]">01 // CONFIGURATION</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Select your target language at the bottom of the shell before starting.</p>
+                        <p className="text-[#00ff41] font-bold text-[10px]">01 // MULTI-LANGUAGE TUTOR</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Solutions default to C, C++, and Python. Need Java or Rust? Just specify in your prompt!</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[#00ff41] font-bold text-[10px]">02 // SCAFFOLDING</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Type your problem. I will provide a conceptual roadmap and progressive hints.</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Type your problem statement. I will provide a conceptual roadmap and progressive hints.</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[#00ff41] font-bold text-[10px]">03 // ACTIVE LEARNING</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Engage with <strong>THINK_ABOUT_THIS</strong> questions to test your mental models.</p>
+                        <p className="text-zinc-400 text-[11px] leading-snug">Engage with THINK_ABOUT_THIS questions to test your mental models.</p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[#00ff41] font-bold text-[10px]">04 // POST-MORTEM</p>
@@ -566,7 +710,7 @@ export default function App() {
             {messages.map((msg, idx) => (
               <div key={idx} className="space-y-3">
                 {/* Prompt Line */}
-                <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-[10px] md:text-xs">
                     <span className={cn(
                       "font-bold shrink-0",
@@ -628,10 +772,10 @@ export default function App() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           key={hIdx}
-                          className="flex gap-2 md:gap-4"
+                          className="flex gap-2 md:gap-4 items-start"
                         >
                           <span className="text-[#00ff41]/30 shrink-0 select-none text-[10px] md:text-sm">H0{hIdx + 1}:</span>
-                          <div className="prose prose-invert prose-xs leading-relaxed text-zinc-400 text-[11px] md:text-sm">
+                          <div className="flex-1 prose prose-invert prose-xs leading-relaxed text-zinc-400 text-[11px] md:text-sm">
                             <Markdown 
                               remarkPlugins={[remarkMath]} 
                               rehypePlugins={[rehypeKatex]}
@@ -649,8 +793,8 @@ export default function App() {
                           animate={{ opacity: 1, y: 0 }}
                           className="mt-6 p-3 md:p-4 bg-[#00ff41]/5 border border-[#00ff41]/10 rounded-sm"
                         >
-                          <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41] uppercase tracking-widest mb-2 flex items-center gap-2">
-                             <MessageSquare className="w-3 h-3" /> THINK_ABOUT_THIS
+                          <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41] uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <MessageSquare className="w-3 h-3" /> THINK_ABOUT_THIS
                           </div>
                           <p className="text-[11px] md:text-sm text-[#00ff41]/80 leading-relaxed italic">
                             {msg.data.reflective_question}
@@ -678,7 +822,7 @@ export default function App() {
                             isSolutionLoading && "opacity-50 cursor-wait"
                           )}
                         >
-                          {isSolutionLoading ? "[ SYTEM: COMPILING_SOLUTION... ]" : "[ SHOW_SOLUTION ]"}
+                          {isSolutionLoading ? "[ SYSTEM: COMPILING_SOLUTION... ]" : "[ SHOW_SOLUTION ]"}
                         </button>
                       )}
                     </div>
@@ -697,46 +841,24 @@ export default function App() {
 
           {/* Prompt Area */}
           <div className="mt-auto pt-4 md:pt-6 border-t border-[#333]/50">
-             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+             <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                {solved ? (
                 <div className="text-[9px] md:text-[10px] text-amber-500/60 uppercase tracking-widest italic">
                   # Follow-up enabled. Ask questions about the implementation.
                 </div>
                ) : (
-                <div className="flex items-center gap-4">
-                  <span className="text-[9px] md:text-[10px] text-[#00ff41]/40 uppercase tracking-widest font-bold">Target Language:</span>
-                  <div className="flex items-center gap-2">
-                    {(['python', 'cpp', 'c'] as const).map((lang) => (
-                      <button
-                        key={lang}
-                        onClick={() => updateActiveTab({ preferredLanguage: lang })}
-                        className={cn(
-                          "px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest transition-all border",
-                          preferredLanguage === lang 
-                            ? "bg-[#00ff41] text-black border-[#00ff41]" 
-                            : "text-[#00ff41] border-[#00ff41]/20 hover:border-[#00ff41]/50"
-                        )}
-                        disabled={isLoading}
-                      >
-                        {lang === 'cpp' ? 'C++' : lang}
-                      </button>
-                    ))}
-                  </div>
+                <div className="text-[9px] md:text-[10px] text-[#00ff41]/40 uppercase tracking-widest font-mono">
+                  # Default solutions: C, C++, Python. Mention a language (e.g., 'in Java') for specific output.
                 </div>
-               )}
-               {!solved && messages.length > 0 && (
-                 <div className="text-[9px] text-[#00ff41]/30 italic">
-                   * Language locked for this active session.
-                 </div>
                )}
              </div>
 
             <form 
               onSubmit={handleSubmit}
-              className="flex flex-col md:flex-row md:items-start gap-1 md:gap-2 group"
+              className="flex flex-col md:flex-row md:items-start gap-2 group"
             >
-              <div className="text-[#00ff41] shrink-0 md:py-1 text-[10px] md:text-sm font-bold opacity-60 md:opacity-100">
-                 student@hintflow %
+              <div className="text-[#00ff41] shrink-0 md:py-1 text-[10px] md:text-sm font-bold opacity-60 md:opacity-100 flex items-center gap-2">
+                 <span>student@hintflow %</span>
               </div>
               <textarea
                 rows={1}
@@ -790,24 +912,34 @@ export default function App() {
                 <div className="bg-black/40 border border-[#222] rounded overflow-hidden">
                   {/* Editor Header */}
                   <div className="flex flex-col md:flex-row md:items-center justify-between px-3 py-2 bg-[#111] border-b border-[#222] gap-3">
-                    <div className="flex items-center gap-2">
-                       <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                        SRC: solution.{modalData.language === 'cpp' ? 'cpp' : modalData.language}
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                       <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-widest shrink-0 mr-2">
+                        LANG:
                       </span>
+                      {modalSolutions.map((sol, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveSolutionLangIdx(idx)}
+                          className={cn(
+                            "px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest transition-all border rounded-sm shrink-0",
+                            activeSolutionLangIdx === idx
+                              ? "bg-[#00ff41] text-black border-[#00ff41]"
+                              : "text-zinc-400 border-zinc-800 hover:text-[#00ff41] hover:border-zinc-700"
+                          )}
+                        >
+                          {sol.language === 'cpp' ? 'C++' : sol.language}
+                        </button>
+                      ))}
                     </div>
                     
                     <div className="flex items-center justify-between md:justify-end gap-6 overflow-x-auto">
-                      <div className="flex items-center gap-2 shrink-0">
-                         <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest border-b border-amber-500">
-                           {modalData.language === 'cpp' ? 'C++' : modalData.language}
-                         </span>
-                      </div>
                       <button
-                        onClick={() => handleCopy(cleanCode(modalData.solution))}
-                        className="text-zinc-500 hover:text-[#00ff41] transition-colors shrink-0"
+                        onClick={() => handleCopy(cleanCode(activeSolutionCodeObj?.code || ''))}
+                        className="text-zinc-500 hover:text-[#00ff41] transition-colors shrink-0 flex items-center gap-1 text-[10px] font-bold"
                         title="COPY"
                       >
                         {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copied ? "COPIED" : "COPY CODE"}</span>
                       </button>
                     </div>
                   </div>
@@ -815,7 +947,13 @@ export default function App() {
                   {/* Editor Content */}
                   <div className="text-[10px] md:text-xs overflow-x-auto">
                     <SyntaxHighlighter
-                      language={modalData.language === 'python' ? 'python' : 'cpp'}
+                      language={
+                        activeSolutionCodeObj?.language?.toLowerCase() === 'cpp' || activeSolutionCodeObj?.language?.toLowerCase() === 'c' 
+                          ? 'cpp' 
+                          : activeSolutionCodeObj?.language?.toLowerCase() === 'python'
+                          ? 'python'
+                          : activeSolutionCodeObj?.language?.toLowerCase() || 'text'
+                      }
                       style={vscDarkPlus}
                       showLineNumbers={true}
                       lineNumberStyle={{ minWidth: '3em', paddingRight: '1rem', color: '#222', textAlign: 'right', userSelect: 'none' }}
@@ -827,7 +965,7 @@ export default function App() {
                         fontFamily: '"Fira Code", monospace'
                       }}
                     >
-                      {cleanCode(modalData.solution)}
+                      {cleanCode(activeSolutionCodeObj?.code || '')}
                     </SyntaxHighlighter>
                   </div>
                 </div>
