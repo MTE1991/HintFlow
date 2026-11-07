@@ -1,183 +1,277 @@
-# HintFlow 📝
+# HintFlow
 
-**HintFlow** is an AI-powered Socratic coding tutor designed specifically for computer science students and research analysis. Instead of providing immediate solutions, HintFlow guides users through programming problems using progressive scaffolding, high-depth technical analysis, and data-rich interactions.
+**HintFlow** is a local-first Socratic tutor for coding problems. It reads a problem statement (or
+your own attempt), returns a short sequence of progressively stronger hints, and only produces a
+full implementation when you explicitly ask for one. Solutions come in **C, C++ and Python** by
+default, or in whatever language you name.
 
-## ✨ Features
+There is no backend and no telemetry: the browser talks to the model API directly, and every session
+is stored in `localStorage`.
 
-- **Unix Terminal Aesthetic**: A professionally crafted, high-contrast UI inspired by classic shell environments and `tmux` multiplexers, using **Fira Code** for all typography.
-- **Interactive Animated Welcome Screen**: A boot screen modal powered by Framer Motion with feature breakdowns, configuration toggles, and click-to-load sample prompts (Two Sum, LRU Cache, Valid Parentheses, Binary Search).
-- **Automatic Browser Cache Persistence**: Stores all active session tabs, message histories, visible hint progression, and user preferences in `localStorage` so sessions persist across browser refreshes and tab closures.
-- **Multi-Language Solution Suite**: Default golden-path solutions in **C, C++, and Python** in a tabbed code viewer, or targeted solutions for custom requested languages (Java, Rust, Go, TypeScript, etc.).
-- **Phase-Based Retrieval (Lazy Loading)**: Implements a dual-phase execution model. Hints are generated instantly (Phase 1), while full solutions and deep-dives are fetched on demand (Phase 2).
-- **Data-Rich Interactions (Research Mode)**: Automatically extracts metadata such as `topic_tags`, `difficulty_score`, and `technical_depth_score` for quantifiable learning analysis.
-- **Socratic "Check for Understanding"**: Generates dynamic `reflective_questions` to force conceptual engagement before code disclosure.
-- **Adaptive Scaffolding**: Analyzes user-provided code for specific logic errors and tailors the initial hint sequence to address those unique mistakes.
-- **Expert Post-Mortem**: Once solved, HintFlow transitions into **Expert Implementation Mode**, providing high-depth technical analysis of memory management, performance trade-offs, and first-principles mechanics.
-- **Complexity Analysis Card**: Dedicated UI for mandatory Time $O(...)$ and Space $O(...)$ complexity metrics.
-- **Common Pitfalls**: Identifies frequent student bugs and edge cases specific to the problem.
-- **Download Research Logs**: Integrated one-click JSON export of all session tabs, messages, and AI-extracted metadata for academic analysis and performance tracking.
+---
 
-## 🛠️ Tech Stack
+## Features
 
-- **Frontend**: React 19, TypeScript, Vite
-- **AI Engine**: Google Gemini 3 Flash (via `@google/genai` TypeScript SDK)
-- **Styling**: Tailwind CSS 4
-- **Animations**: Motion (`motion/react`)
-- **Icons**: Lucide React
-- **Syntax Highlighting**: React Syntax Highlighter (Prism / VS Code Dark Plus)
-- **Math Support**: Full LaTeX support for algorithmic expressions using KaTeX & remark-math / rehype-katex.
+- **Hints before answers.** A model-generated "big idea", then hints revealed one at a time, plus a
+  `Think about this` question that has to be considered before the solution unlocks.
+- **On-demand solutions.** `[ Show solution ]` fetches a tabbed C / C++ / Python viewer with a
+  complexity card, common pitfalls, a deep-dive explanation and further reading.
+- **Follow-up mode.** Once solved, the terminal switches to an expert consultant for questions about
+  complexity, memory, or edge cases.
+- **Light and dark themes.** A full second palette (not a CSS filter) with matching syntax themes —
+  Atom One Dark and Atom One Light.
+- **Adjustable text size.** 87.5% / 100% / 115% / 130%, scaling every text size in the UI.
+- **Session tabs.** `tmux`-style tabs; each keeps its own transcript, hint progress and solved state.
+- **Everything persists locally.** Tabs, active tab, theme, text size and the welcome-screen
+  preference survive a refresh.
+- **Research log export.** Downloads the whole session state as JSON.
+- **Markdown and maths.** Answers render Markdown, fenced code and KaTeX.
 
-## 🚀 Getting Started
+---
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| UI | React 19, TypeScript, Vite 7 |
+| Styling | Tailwind CSS 4 with CSS-variable design tokens |
+| Animation | Motion (`motion/react`) |
+| Icons | Lucide React |
+| Highlighting | `react-syntax-highlighter` (Prism) — Atom One Dark / One Light |
+| Markdown / maths | `react-markdown`, `remark-math`, `rehype-katex` |
+| Model | `deepseek/deepseek-v4.1-flash-free` via OrcaRouter (OpenAI-compatible) |
+
+---
+
+## Getting started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [npm](https://www.npmjs.com/) (v9 or higher)
-- A Google Gemini API Key (Get one at [Google AI Studio](https://aistudio.google.com/))
+- Node.js **20.19+** or **22.12+** (required by Vite 7)
+- npm 9+
+- An OrcaRouter API key — <https://api.orcarouter.ai>
 
-### Installation
-
-1. **Clone or download** the repository.
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Configure Environment**: Set `GEMINI_API_KEY` in your environment variables or a `.env` file.
-
-### Running the App
+### Install
 
 ```bash
-npm run dev
+npm install
 ```
-The app will be available at `http://localhost:3000`.
 
-## 📖 Interactive Workflow
+`better-sqlite3` is an unused leftover dependency. On very new Node releases its native build can
+fail and abort the install; run `npm install --ignore-scripts` in that case.
 
-1. **Welcome Screen & Quick Start**: Launch with animated guidance or pick a starter prompt (e.g. Two Sum, LRU Cache).
-2. **Input Challenge**: Type your problem statement or code snippet at the `student@hintflow %` prompt. Mention a specific language if desired (e.g., *"in Java"*).
-3. **Analyze Scaffolding**: Review the **Big Idea** and work through the progressive 4-tier hints.
-4. **Solve Reflection**: Answer the `THINK_ABOUT_THIS` reflective question before unveiling the solution.
-5. **Code Inspection**: Fetch the full solution. Toggle between multi-language solutions (C, C++, Python) and inspect the **Complexity Analysis** card.
-6. **Local Persistence**: Work across multiple tabs (`tmux` multiplexer bar)—all state is automatically cached in your browser.
-7. **Expert Follow-up**: Ask descriptive questions for a deep-dive post-mortem analysis.
-8. **Export Logs**: Click the download icon to save full research logs as a structured JSON file.
+### Configure
 
-## 🧠 Under the Hood
+Create `.env` in the project root:
 
-### System Architecture
+```bash
+VITE_ORCAROUTER_API_KEY="sk-orca-..."
+```
+
+Vite only exposes variables prefixed with `VITE_`, and they are **inlined into the client bundle**.
+Treat this key as public: use a key with a spending limit, and never deploy a production build
+publicly (see [Security](#security)).
+
+### Run
+
+```bash
+npm run dev      # http://localhost:3000
+```
+
+Other scripts:
+
+```bash
+npm run lint     # tsc --noEmit
+npm run build    # production build into dist/
+npm run clean    # remove dist/
+```
+
+---
+
+## Using it
+
+1. Type a problem — or paste your attempt — at the `student@hintflow %` prompt.
+2. Read the overview and reveal hints with `[ Reveal hint (n of m) ]`.
+3. When the last hint is shown, `[ Show solution ]` becomes available.
+4. Use the `LANG` tabs to switch between languages; `COPY CODE` copies the current one.
+5. Ask follow-up questions in the same input once the solution is unlocked.
+6. `[+]` opens a new session tab; the download icon exports the research log; the reset icon clears
+   every tab.
+
+### Controls
+
+| Control | Location | Behavior |
+| --- | --- | --- |
+| Sun / moon | Terminal title bar and welcome screen | Toggles light and dark mode; saved to `localStorage` |
+| `−` / `+` | Terminal title bar | Steps text size through 87.5% → 100% → 115% → 130%; saved |
+| `?` | Title bar | Reopens the welcome screen |
+| Download | Title bar | Exports all tabs as `hintflow_research_logs_<timestamp>.json` |
+| Reset | Title bar | Replaces every tab with a fresh session — immediate, no confirmation |
+
+---
+
+## How it works
+
+The app runs a three-phase state machine. Every phase is a single chat completion whose JSON contract
+is described in the system prompt.
+
+| Phase | Trigger | Thinking | Typical latency |
+| --- | --- | --- | --- |
+| **Hints** | New problem or code | enabled, `reasoning_effort: low` | ~5 s |
+| **Solution** | `[ Show solution ]` | **disabled** | ~10 s |
+| **Follow-up** | Message after solving | enabled, `reasoning_effort: high` | varies |
+
+The solution phase deliberately disables reasoning. On this model, hidden reasoning tokens were the
+dominant cost — measured 25–53 s with thinking versus 9–10 s without — and a code-transcription task
+does not need them. Hints and follow-ups keep thinking because their quality depends on it.
 
 ```mermaid
-graph TD
-    subgraph UI [Frontend Layer: React 19]
-        U([User])
-        Welcome[Welcome Screen Modal]
-        Terminal[Terminal Shell UI]
-        Tabs[Session Tab Manager]
-        Cache[(Local Storage Cache)]
-        LogExport[Research Log Downloader]
-        
-        U -- First Launch / Guide --> Welcome
-        U -- Inputs Problem --> Terminal
-        U -- Switch Context --> Tabs
-        Tabs <--> Cache
-        LogExport -- Triggers --> Export[.json Logs]
-    end
-
-    subgraph APP [Application Logic]
-        SM[State Manager: Tabs & Messages]
-        PM{Phase Manager}
-        
-        Terminal -- Action --> SM
-        SM -- Request Context --> PM
-    end
-
-    subgraph CORE [Instructional Orchestrator]
-        P1[[Phase 1: Socratic Scaffolding]]
-        P2[[Phase 2: Expert Implementation]]
-        P3[[Expert Post-Mortem Consultant]]
-        
-        PM -- "New / Hinting" --> P1
-        PM -- "[ SHOW_SOLUTION ]" --> P2
-        PM -- "Follow-up Query" --> P3
-    end
-
-    subgraph LLM [Neural Engine: Gemini 3 Flash]
-        G((Gemini API))
-        SJ[Strict JSON Schema Guard]
-        
-        P1 & P2 & P3 -- Adaptive Prompts --> G
-        G -- Parsed Response --> SJ
-    end
-
-    SJ -- "Extracted Metadata & Content" --> SM
-    SM -- Re-render --> Terminal
+graph LR
+    U[User input] --> P{Phase}
+    P -- new problem --> H[HINTS_INSTRUCTION]
+    P -- show solution --> S[SOLUTION_INSTRUCTION]
+    P -- after solved --> F[FOLLOWUP_INSTRUCTION]
+    H --> R[OrcaRouter<br/>chat/completions]
+    S --> R
+    F --> R
+    R --> J[response_format: json_object]
+    J --> X[extractJson + JSON.parse<br/>one retry on malformed output]
+    X --> C[coerceHintFlow<br/>type + range normalization]
+    C --> ST[Tab state]
+    ST --> UI[Terminal UI]
+    ST --> LS[(localStorage)]
 ```
 
-### Instructional Modes
-HintFlow utilizes a specialized state-machine for pedagogical delivery:
+### Why responses are coerced, not schema-validated
 
-1. **HINT_MODE (Phase 1)**: Focuses on "Desirable Difficulty." It provides conceptual analogies, pseudocode strategies, minimal bottleneck snippets, and a "reflective question" to ensure the student builds a mental map before viewing code.
-2. **SOLUTION_MODE (Phase 2)**: Triggered on-demand. Generates idiomatic, production-grade implementations (defaulting to C, C++, and Python, or specific requested languages) with trade-off analysis and common pitfalls.
-3. **FOLLOWUP_MODE (Post-Mortem)**: Acts as an **Expert Implementation Consultant**. It answers "under the hood" questions regarding stack frames, memory management, compiler optimizations, and real-world engineering scenarios.
+The client asks for `response_format: { type: "json_object" }`, not a strict JSON schema: OrcaRouter
+documents schema support, but it varies per upstream model. `json_object` guarantees syntactically
+valid JSON and nothing about its fields, so `coerceHintFlow` in `src/lib/llm.ts` normalizes every
+field the UI indexes into — strings default to `""`, arrays are filtered, and scores are clamped
+(`difficulty_score` 1–10, `technical_depth_score` 1–5). A partial model response degrades instead of
+crashing the terminal. Malformed JSON is retried once before failing.
 
-### Research & Data Quantification
-To support technical publications and quantifiable analysis, every AI response includes research metrics:
-- **`topic_tags`**: For domain difficulty analysis.
-- **`difficulty_score` (1-10)**: Quantifies the cognitive load of a given problem.
-- **`technical_depth_score` (1-5)**: Measures the complexity of expert follow-up responses.
+### Response contracts
 
-#### 📊 Data Export (Research Logs)
-The `[ DOWNLOAD_LOGS ]` button exports the full session state as a structured JSON file. This includes:
-- **Global Metadata**: Device-agnostic timestamps and session identifiers.
-- **Transcript Data**: Every user prompt vs. AI response sequence.
-- **Extracted Metrics**: All cognitive load scores and topic tags for each interaction.
-- **Complexity Analysis**: Captured Time/Space complexity data for solutions.
+**Hints**
 
-### Structured Response Schema
-HintFlow leverages **STRICT JSON** enforcement to ensure the React frontend remains robust. The schema evolves based on the active phase:
-
-**Phase 1 Response:**
 ```json
 {
   "isRelevant": true,
-  "topic_tags": ["Recursion", "Arrays"],
-  "difficulty_score": 7,
-  "overview": "Big Idea explanation...",
-  "hints": ["Hint 1", "Hint 2", "Hint 3", "Hint 4"],
-  "reflective_question": "Socratic CFU..."
+  "topic_tags": ["Arrays", "Hash Map"],
+  "difficulty_score": 3,
+  "overview": "The big idea...",
+  "hints": ["...", "...", "...", "..."],
+  "reflective_question": "..."
 }
 ```
 
-**Phase 2 Response:**
+**Solution**
+
 ```json
 {
   "solutions": [
-    { "language": "c", "code": "...code..." },
-    { "language": "cpp", "code": "...code..." },
-    { "language": "python", "code": "...code..." }
+    { "language": "c", "code": "..." },
+    { "language": "cpp", "code": "..." },
+    { "language": "python", "code": "..." }
   ],
-  "complexity": { "time": "O(n log n)", "space": "O(n)" },
-  "explanation": "Deep dive text...",
-  "pitfalls": ["Common bug 1", "Common bug 2"],
+  "complexity": { "time": "O(n)", "space": "O(n)" },
+  "explanation": "...",
+  "pitfalls": ["..."],
   "resources": {
-    "books": [{ "title": "Introduction to Algorithms", "author": "Cormen et al." }],
-    "websites": [{ "name": "GeeksforGeeks", "url": "https://geeksforgeeks.org" }]
+    "books": [{ "title": "...", "author": "..." }],
+    "websites": [{ "name": "...", "url": "..." }]
   }
 }
 ```
 
-**Follow-up Response:**
+**Follow-up**
+
 ```json
-{
-  "overview": "Direct expert answer...",
-  "technical_depth_score": 4,
-  "hints": []
-}
+{ "overview": "...", "technical_depth_score": 4, "hints": [] }
 ```
 
-## 📜 License
+---
 
-This project is licensed under the **Apache-2.0 License**.
+## Theming
+
+Colours are CSS custom properties, not hardcoded utilities, so both palettes come from one markup
+tree (`src/index.css`).
+
+| Token | Dark | Light |
+| --- | --- | --- |
+| `--onyx` (page) | `#000000` | `#f5f5f2` |
+| `--surface` (terminal) | `#0c0c0c` | `#fbfbf9` |
+| `--chrome` (bars, chips) | `#1a1a1a` | `#e8e8e3` |
+| `--titlebar` | `#2d2d2d` | `#dfdfd8` |
+| `--line` | `#333333` | `#c6c6be` |
+| `--accent` | `#00ff41` | `#067a2e` |
+
+Three details make the light theme work rather than merely invert:
+
+1. **The zinc ramp is inverted** under `html[data-theme="light"]`. The markup uses `zinc-400` for
+   muted text and `zinc-800/900` for blocks, which only read correctly on a dark canvas.
+2. **Warm accents darken** (amber, red, emerald, sky) to keep contrast on paper.
+3. **Code snippets switch syntax theme** — Atom One Dark (`#282c34`) in dark mode, Atom One Light
+   (`#fafafa`) in light mode — so tokens never land on a background they were not designed for.
+
+Text size is a single `--fs` variable on `<html>`. Rem-based utilities scale with the root font size,
+and fixed pixel sizes use `calc(9px * var(--fs))`.
+
+A small inline script in `index.html` applies the stored theme and size before React mounts, so a
+light-mode session does not flash dark on load.
 
 ---
-*Built for the next generation of software engineers and researchers.*
+
+## Project structure
+
+```
+index.html                       Shell, page title, pre-paint theme/size script
+src/main.tsx                     React entry point
+src/App.tsx                      Terminal UI, phase orchestration, prompts, persistence
+src/components/WelcomeScreen.tsx Welcome screen with samples and theme toggle
+src/lib/llm.ts                   OrcaRouter client, retry, response coercion
+src/types.ts                     Shared response and tab types
+src/index.css                    Design tokens, theme variants, scrollbars
+vite.config.ts                   React + Tailwind plugins, path alias
+```
+
+`localStorage` keys: `hintflow_sessions_v1`, `hintflow_active_tab_v1`, `hintflow_show_welcome_v1`,
+`hintflow_theme_v1`, `hintflow_font_scale_v1`.
+
+---
+
+## Security
+
+The API key is inlined into the JavaScript bundle because the browser calls the API directly. That is
+fine for local use and unacceptable for a public deployment — anyone can read the bundle and spend
+your credits.
+
+- Keep `.env` out of version control.
+- Do not expose the dev server on all interfaces. `npm run dev` currently passes `--host=0.0.0.0`;
+  bind it to `127.0.0.1` if you are not deliberately sharing it.
+- `dist/` contains the key. Run `npm run clean` after building.
+- Rotate the key if it has ever been shared or committed.
+
+If you need a public deployment, move the call behind a server-side proxy with its own rate limiting
+and per-user quota — the response contracts above are unchanged.
+
+---
+
+## Known limitations
+
+- **Direct browser calls depend on CORS.** OrcaRouter answers preflights with
+  `access-control-allow-origin: *`, which is what allows a backend-free design. A provider that does
+  not would require a proxy.
+- **Free-tier reliability.** Upstream quota and availability fluctuate; the terminal surfaces the
+  provider's HTTP status and a retry prompt instead of failing silently.
+- **No streaming.** A solution arrives as one payload (~10 s), not token by token.
+- **No conversation window.** Each request carries the current prompt plus the problem context; long
+  follow-up threads are not replayed in full.
+- **Learner state is per browser.** Clearing site data clears every session.
+
+---
+
+## License
+
+Apache-2.0.

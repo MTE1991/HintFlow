@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>HintFlow</title>
+    <script>
+      // Apply the saved theme and text size before first paint, otherwise a
+      // light-mode session flashes dark until React mounts.
+      (function () {
+        try {
+          var theme = localStorage.getItem('hintflow_theme_v1');
+          if (theme === 'light' || theme === 'dark') {
+            document.documentElement.dataset.theme = theme;
+          }
+          var scale = Number(localStorage.getItem('hintflow_font_scale_v1'));
+          if (scale >= 0.5 && scale <= 2) {
+            document.documentElement.style.setProperty('--fs', String(scale));
+          }
+        } catch (err) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

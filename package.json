@@ -11,7 +11,6 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google/genai": "^1.44.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "better-sqlite3": "^12.6.2",
     "clsx": "^2.1.1",

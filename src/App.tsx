@@ -3,39 +3,51 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Terminal, RefreshCcw, Copy, Check, X, 
-  MessageSquare, Download, HelpCircle, HardDrive
+  MessageSquare, Download, HelpCircle, HardDrive,
+  Sun, Moon, Minus, Plus
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { HintFlowResponse, Tab } from './types';
+import { generateJson, coerceHintFlow } from './lib/llm';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const markdownComponents = {
+/** Code snippets use Atom One Dark on the dark canvas and Atom One Light on paper. */
+const SYNTAX_THEMES: Record<Theme, typeof oneDark> = {
+  dark: oneDark,
+  light: oneLight,
+};
+
+/** Comment-grey line numbers that stay legible on each theme's own background. */
+const LINE_NUMBER_COLORS: Record<Theme, string> = {
+  dark: '#5c6370',
+  light: '#8b8f97',
+};
+
+const createMarkdownComponents = (theme: Theme) => ({
   code({ inline, className, children, ...props }: any) {
     const match = /language-(\w+)/.exec(className || '');
     return !inline && match ? (
       <div className="my-3 rounded-lg overflow-hidden border border-zinc-800">
         <SyntaxHighlighter
           language={match[1]}
-          style={vscDarkPlus}
+          style={SYNTAX_THEMES[theme]}
           PreTag="div"
           customStyle={{ 
             margin: 0, 
-            background: '#000',
             padding: '1rem',
             fontSize: '11px',
             lineHeight: '1.5',
@@ -47,12 +59,12 @@ const markdownComponents = {
         </SyntaxHighlighter>
       </div>
     ) : (
-      <code className={cn("bg-zinc-800 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-500/80", className)} {...props}>
+      <code className={cn("bg-zinc-800 px-1.5 py-0.5 rounded text-[calc(11px*var(--fs))] font-mono text-amber-500/80", className)} {...props}>
         {children}
       </code>
     );
   },
-};
+});
 
 const HINTS_INSTRUCTION = `You are **HintFlow**, a specialized Socratic tutor. 
 Your goal is to scaffold learning by minimizing "Cognitive Load" while maximizing "Desirable Difficulty."
@@ -146,6 +158,13 @@ The user has the solution and is now performing a "Post-Mortem" analysis.
 const SESSIONS_STORAGE_KEY = 'hintflow_sessions_v1';
 const ACTIVE_TAB_STORAGE_KEY = 'hintflow_active_tab_v1';
 const SHOW_WELCOME_STORAGE_KEY = 'hintflow_show_welcome_v1';
+const THEME_STORAGE_KEY = 'hintflow_theme_v1';
+const FONT_SCALE_STORAGE_KEY = 'hintflow_font_scale_v1';
+
+type Theme = 'dark' | 'light';
+
+/** 100% is the design size; the rest scale every text token in the app. */
+const FONT_SCALES = [0.875, 1, 1.15, 1.3];
 
 const getInitialTabs = (): Tab[] => {
   try {
@@ -193,6 +212,30 @@ const getInitialShowWelcome = (): boolean => {
   return true;
 };
 
+const getInitialTheme = (): Theme => {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === 'light' || saved === 'dark') {
+      return saved;
+    }
+  } catch (err) {
+    console.error("Failed to load theme from local storage", err);
+  }
+  return 'dark';
+};
+
+const getInitialFontScale = (): number => {
+  try {
+    const saved = Number(localStorage.getItem(FONT_SCALE_STORAGE_KEY));
+    if (FONT_SCALES.includes(saved)) {
+      return saved;
+    }
+  } catch (err) {
+    console.error("Failed to load font size from local storage", err);
+  }
+  return 1;
+};
+
 export default function App() {
   const [tabs, setTabs] = useState<Tab[]>(getInitialTabs);
   const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -202,6 +245,8 @@ export default function App() {
 
   const [showWelcomeOnStart, setShowWelcomeOnStart] = useState<boolean>(getInitialShowWelcome);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(showWelcomeOnStart);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [fontScale, setFontScale] = useState<number>(getInitialFontScale);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0] || {
     id: 'initial',
@@ -221,7 +266,16 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+  const markdownComponents = useMemo(() => createMarkdownComponents(theme), [theme]);
+
+  const fontScaleIndex = FONT_SCALES.indexOf(fontScale);
+  const canDecreaseFont = fontScaleIndex > 0;
+  const canIncreaseFont = fontScaleIndex < FONT_SCALES.length - 1;
+
+  const changeFontScale = (delta: number) => {
+    const nextIndex = Math.min(FONT_SCALES.length - 1, Math.max(0, fontScaleIndex + delta));
+    setFontScale(FONT_SCALES[nextIndex]);
+  };
 
   // Persistence Effects
   useEffect(() => {
@@ -247,6 +301,24 @@ export default function App() {
       console.error("Failed to save welcome preference to local storage", err);
     }
   }, [showWelcomeOnStart]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (err) {
+      console.error("Failed to save theme to local storage", err);
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--fs', String(fontScale));
+    try {
+      localStorage.setItem(FONT_SCALE_STORAGE_KEY, String(fontScale));
+    } catch (err) {
+      console.error("Failed to save font size to local storage", err);
+    }
+  }, [fontScale]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -307,43 +379,13 @@ export default function App() {
         ? FOLLOWUP_INSTRUCTION
         : HINTS_INSTRUCTION;
 
-      const responseSchemaPhase1 = {
-        type: Type.OBJECT,
-        properties: {
-          isRelevant: { type: Type.BOOLEAN },
-          topic_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          difficulty_score: { type: Type.NUMBER },
-          overview: { type: Type.STRING },
-          hints: { 
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
-          },
-          reflective_question: { type: Type.STRING }
-        },
-        required: ["isRelevant", "topic_tags", "difficulty_score", "overview", "hints", "reflective_question"]
-      };
-
-      const responseSchemaFollowUp = {
-        type: Type.OBJECT,
-        properties: {
-          overview: { type: Type.STRING },
-          technical_depth_score: { type: Type.NUMBER },
-          hints: { type: Type.ARRAY, items: { type: Type.STRING } }
-        },
-        required: ["overview", "technical_depth_score", "hints"]
-      };
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: userMessage,
-        config: {
-          systemInstruction: customInstruction,
-          responseMimeType: "application/json",
-          responseSchema: isFollowUp ? responseSchemaFollowUp : responseSchemaPhase1
-        },
-      });
-
-      const data = JSON.parse(response.text || '{}') as HintFlowResponse;
+      const data = coerceHintFlow(
+        await generateJson<HintFlowResponse>({
+          system: customInstruction,
+          user: userMessage,
+          reasoningEffort: isFollowUp ? 'high' : 'low',
+        }),
+      );
       
       setTabs(prev => prev.map(t => {
         if (t.id === currentTabId) {
@@ -412,75 +454,16 @@ export default function App() {
     try {
       const problemStatement = activeTab.messages.length > 0 ? activeTab.messages[0].content : '';
       
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Provide the full solution for this coding problem: "${problemStatement}". If I explicitly requested a specific programming language in my prompt, provide only that requested language in the solutions array. Otherwise, default to providing solutions for C, C++, and Python in the solutions array.`,
-        config: {
-          systemInstruction: SOLUTION_INSTRUCTION,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              solutions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    language: { type: Type.STRING },
-                    code: { type: Type.STRING }
-                  },
-                  required: ["language", "code"]
-                }
-              },
-              complexity: {
-                type: Type.OBJECT,
-                properties: {
-                  time: { type: Type.STRING },
-                  space: { type: Type.STRING }
-                },
-                required: ["time", "space"]
-              },
-              explanation: { type: Type.STRING },
-              pitfalls: { type: Type.ARRAY, items: { type: Type.STRING } },
-              resources: {
-                type: Type.OBJECT,
-                properties: {
-                  books: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        title: { type: Type.STRING },
-                        author: { type: Type.STRING }
-                      },
-                      required: ["title", "author"]
-                    }
-                  },
-                  websites: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        name: { type: Type.STRING },
-                        url: { type: Type.STRING }
-                      },
-                      required: ["name", "url"]
-                    }
-                  }
-                },
-                required: ["books", "websites"]
-              }
-            },
-            required: ["solutions", "complexity", "explanation", "pitfalls", "resources"]
-          }
-        },
+      const solutionData = await generateJson<Partial<HintFlowResponse>>({
+        system: SOLUTION_INSTRUCTION,
+        user: `Provide the full solution for this coding problem: "${problemStatement}". If I explicitly requested a specific programming language in my prompt, provide only that requested language in the solutions array. Otherwise, default to providing solutions for C, C++, and Python in the solutions array.`,
+        thinking: 'disabled',
       });
 
-      const solutionData = JSON.parse(response.text || '{}');
-      const fullResponse: HintFlowResponse = {
+      const fullResponse: HintFlowResponse = coerceHintFlow({
         ...data,
         ...solutionData
-      };
+      });
 
       setTabs(prev => prev.map(t => t.id === activeTabId ? {
         ...t,
@@ -563,7 +546,7 @@ export default function App() {
   const activeSolutionCodeObj = modalSolutions[activeSolutionLangIdx] || modalSolutions[0];
 
   return (
-    <div className="h-[100dvh] w-full flex items-center justify-center p-0 md:p-4 lg:p-8 bg-black overflow-hidden font-mono antialiased">
+    <div className="h-[100dvh] w-full flex items-center justify-center p-0 md:p-4 lg:p-8 bg-onyx overflow-hidden font-mono antialiased">
       {/* Animated Welcome Screen Modal */}
       <AnimatePresence>
         {isWelcomeModalOpen && (
@@ -572,40 +555,73 @@ export default function App() {
             onClose={() => setIsWelcomeModalOpen(false)}
             showOnStart={showWelcomeOnStart}
             setShowOnStart={setShowWelcomeOnStart}
+            theme={theme}
+            onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           />
         )}
       </AnimatePresence>
 
       {/* Terminal Window */}
-      <div className="w-full h-full max-w-6xl md:h-[90vh] flex flex-col bg-[#0c0c0c] md:border md:border-[#333] shadow-2xl relative overflow-hidden md:rounded-lg">
+      <div className="w-full h-full max-w-6xl md:h-[90vh] flex flex-col bg-surface md:border md:border-line shadow-2xl relative overflow-hidden md:rounded-lg">
         
         {/* Title Bar */}
-        <div className="flex items-center justify-between px-3 py-2 md:px-4 bg-[#2d2d2d] border-b border-[#333] shrink-0">
+        <div className="flex items-center justify-between px-3 py-2 md:px-4 bg-titlebar border-b border-line shrink-0">
           <div className="flex items-center gap-3 md:gap-6 overflow-hidden">
             <div className="hidden md:flex gap-2">
               <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
               <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
               <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
             </div>
-            <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold text-zinc-400 truncate">
-              <Terminal className="w-3 md:w-3.5 h-3 md:h-3.5 shrink-0 text-[#00ff41]" />
+            <div className="flex items-center gap-2 text-[calc(10px*var(--fs))] md:text-xs font-bold text-zinc-400 truncate">
+              <Terminal className="w-3 md:w-3.5 h-3 md:h-3.5 shrink-0 text-accent" />
               <span className="truncate">hintflow — user — 80x24</span>
-              <span className="hidden lg:inline-flex items-center gap-1 text-[9px] text-[#00ff41]/80 px-1.5 py-0.2 rounded border border-[#00ff41]/20 font-mono ml-2">
+              <span className="hidden lg:inline-flex items-center gap-1 text-[calc(9px*var(--fs))] text-accent/80 px-1.5 py-0.2 rounded border border-accent/20 font-mono ml-2">
                 <HardDrive className="w-2.5 h-2.5" /> LOCAL_CACHE_ONLINE
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
+             <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="text-zinc-400 hover:text-accent transition-colors p-1"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+              <div className="flex items-center gap-0.5 pl-1.5 ml-0.5 border-l border-line">
+                <button
+                  onClick={() => changeFontScale(-1)}
+                  disabled={!canDecreaseFont}
+                  className="text-zinc-400 hover:text-accent transition-colors p-1 disabled:opacity-30"
+                  title="Smaller text"
+                  aria-label="Decrease text size"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <span className="text-[calc(8px*var(--fs))] text-zinc-500 font-mono tabular-nums w-7 text-center select-none">
+                  {Math.round(fontScale * 100)}%
+                </span>
+                <button
+                  onClick={() => changeFontScale(1)}
+                  disabled={!canIncreaseFont}
+                  className="text-zinc-400 hover:text-accent transition-colors p-1 disabled:opacity-30"
+                  title="Larger text"
+                  aria-label="Increase text size"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
              <button 
                 onClick={() => setIsWelcomeModalOpen(true)}
-                className="text-zinc-400 hover:text-[#00ff41] transition-colors p-1"
+                className="text-zinc-400 hover:text-accent transition-colors p-1"
                 title="Open Welcome Screen & Guide"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
               </button>
              <button 
                 onClick={downloadResearchLogs}
-                className="text-zinc-400 hover:text-[#00ff41] transition-colors p-1"
+                className="text-zinc-400 hover:text-accent transition-colors p-1"
                 title="Download Research Logs"
                 disabled={messages.length === 0}
               >
@@ -622,25 +638,25 @@ export default function App() {
         </div>
 
         {/* Tab Bar (Tmux style) */}
-        <div className="flex items-center bg-[#1a1a1a] px-2 py-1 shrink-0 gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex items-center bg-chrome px-2 py-1 shrink-0 gap-1 overflow-x-auto no-scrollbar">
            {tabs.map((tab, idx) => (
             <div
               key={tab.id}
               className={cn(
-                "group/tab flex items-center gap-2 px-3 py-1 text-[10px] font-bold cursor-pointer transition-colors border-r border-[#333]/30",
+                "group/tab flex items-center gap-2 px-3 py-1 text-[calc(10px*var(--fs))] font-bold cursor-pointer transition-colors border-r border-line/30",
                 activeTabId === tab.id 
-                  ? "bg-[#00ff41] text-black" 
-                  : "text-[#00ff41]/50 hover:bg-[#252525]"
+                  ? "bg-accent text-on-accent" 
+                  : "text-accent/50 hover:bg-chrome-hover"
               )}
               onClick={() => setActiveTabId(tab.id)}
             >
               <span>{idx}: {tab.title}</span>
-              {tab.solved && <span className="text-[8px]">●</span>}
+              {tab.solved && <span className="text-[calc(8px*var(--fs))]">●</span>}
               <button
                 onClick={(e) => closeTab(e, tab.id)}
                 className={cn(
                   "opacity-0 group-hover/tab:opacity-100 hover:text-red-500 transition-opacity",
-                  activeTabId === tab.id && "opacity-60 text-black hover:text-red-900"
+                  activeTabId === tab.id && "opacity-60 text-on-accent hover:text-red-900"
                 )}
               >
                 <X className="w-2.5 h-2.5" />
@@ -649,7 +665,7 @@ export default function App() {
           ))}
           <button 
             onClick={() => createNewTab()}
-            className="px-3 py-1 text-[10px] font-bold text-[#00ff41]/30 hover:text-[#00ff41] transition-colors"
+            className="px-3 py-1 text-[calc(10px*var(--fs))] font-bold text-accent/30 hover:text-accent transition-colors"
             title="Create New Session Tab"
           >
             [+]
@@ -664,44 +680,26 @@ export default function App() {
             className="flex-1 overflow-y-auto space-y-6 terminal-scroll md:pr-4 touch-auto"
           >
             {messages.length === 0 && (
-              <div className="space-y-4 opacity-80 text-xs md:text-sm">
-                <div className="text-[#00ff41]">
+              <div className="space-y-5 text-xs md:text-sm">
+                <div className="text-accent">
                   <p>HintFlow OS v1.3.0 (tty1)</p>
-                  <p>Login successful: user@hintflow</p>
-                  <p className="hidden md:block">Last login: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                  <p>user@hintflow — ready</p>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-zinc-500 leading-relaxed max-w-xl">
-                    Welcome to <span className="text-[#00ff41] font-bold italic">HintFlow</span>. I am a Socratic tutor for problem solving & engineering.
+                <div className="space-y-3 max-w-xl">
+                  <p className="text-zinc-400 leading-relaxed">
+                    A Socratic tutor for coding problems. You get hints first, and the full solution only when you ask for it.
+                  </p>
+                  <ol className="space-y-1.5 text-zinc-400">
+                    <li><span className="text-accent font-bold">1.</span> Paste a problem — or your own attempt.</li>
+                    <li><span className="text-accent font-bold">2.</span> Reveal hints one at a time.</li>
+                    <li><span className="text-accent font-bold">3.</span> Unlock the solution when you're ready.</li>
+                  </ol>
+                  <p className="text-zinc-500 text-[calc(11px*var(--fs))]">
+                    Solutions come in C, C++ and Python. Say "in Java" (or any language) to get something else.
                   </p>
                   
-                  <div className="mt-6 space-y-4 max-w-2xl bg-zinc-900/30 p-4 border border-zinc-800/50 rounded-sm">
-                    <div className="text-[10px] uppercase font-bold text-[#00ff41]/60 tracking-widest mb-3 flex items-center justify-between">
-                      <span>&gt; QUICK_START_GUIDE</span>
-                      <span className="text-[9px] text-[#00ff41]/40 font-normal">SESSIONS PERSISTED IN LOCAL CACHE</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                      <div className="space-y-1">
-                        <p className="text-[#00ff41] font-bold text-[10px]">01 // MULTI-LANGUAGE TUTOR</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Solutions default to C, C++, and Python. Need Java or Rust? Just specify in your prompt!</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[#00ff41] font-bold text-[10px]">02 // SCAFFOLDING</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Type your problem statement. I will provide a conceptual roadmap and progressive hints.</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[#00ff41] font-bold text-[10px]">03 // ACTIVE LEARNING</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">Engage with THINK_ABOUT_THIS questions to test your mental models.</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[#00ff41] font-bold text-[10px]">04 // POST-MORTEM</p>
-                        <p className="text-zinc-400 text-[11px] leading-snug">After seeing the solution, ask "why" or "how" for first-principles engineering analysis.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest mt-6">
-                    SYSTEM: Listening for problem statement at stdin...
+                  <p className="text-zinc-600 text-[calc(11px*var(--fs))]">
+                    Type below and press Enter to start. Your sessions are saved in this browser.
                   </p>
                 </div>
               </div>
@@ -711,32 +709,32 @@ export default function App() {
               <div key={idx} className="space-y-3">
                 {/* Prompt Line */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-[10px] md:text-xs">
+                  <div className="flex items-center gap-2 text-[calc(10px*var(--fs))] md:text-xs">
                     <span className={cn(
                       "font-bold shrink-0",
-                      msg.role === 'user' ? "text-[#00ff41]" : "text-amber-500"
+                      msg.role === 'user' ? "text-accent" : "text-amber-500"
                     )}>
                       [{msg.role === 'user' ? 'student' : 'mentor'}@hintflow]$
                     </span>
-                    <span className="text-zinc-600 text-[9px] md:text-[10px] uppercase font-bold tracking-tighter shrink-0">
+                    <span className="text-zinc-600 text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] uppercase font-bold tracking-tighter shrink-0">
                       {msg.isFollowUp ? "# follow-up" : "# core"}
                     </span>
                     {msg.data?.topic_tags && (
                       <div className="flex gap-1 overflow-hidden">
                         {msg.data.topic_tags.map((tag, tIdx) => (
-                          <span key={tIdx} className="text-[8px] md:text-[9px] px-1 bg-zinc-800 text-zinc-500 rounded border border-zinc-700">
+                          <span key={tIdx} className="text-[calc(8px*var(--fs))] md:text-[calc(9px*var(--fs))] px-1 bg-zinc-800 text-zinc-500 rounded border border-zinc-700">
                              {tag}
                           </span>
                         ))}
                       </div>
                     )}
                     {msg.data?.difficulty_score && (
-                      <span className="text-[8px] md:text-[9px] text-[#00ff41]/40 px-1 border border-[#00ff41]/20 rounded font-mono">
+                      <span className="text-[calc(8px*var(--fs))] md:text-[calc(9px*var(--fs))] text-accent/40 px-1 border border-accent/20 rounded font-mono">
                         DIFF: {msg.data.difficulty_score}/10
                       </span>
                     )}
                     {msg.data?.technical_depth_score && (
-                      <span className="text-[8px] md:text-[9px] text-amber-500/40 px-1 border border-amber-500/20 rounded font-mono">
+                      <span className="text-[calc(8px*var(--fs))] md:text-[calc(9px*var(--fs))] text-amber-500/40 px-1 border border-amber-500/20 rounded font-mono">
                         DEPTH: {msg.data.technical_depth_score}/5
                       </span>
                     )}
@@ -748,7 +746,7 @@ export default function App() {
                    "pl-3 md:pl-6 border-l border-zinc-800/50 py-1",
                    msg.role === 'assistant' && "text-zinc-200"
                 )}>
-                  <div className="prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-[#00ff41] prose-code:bg-transparent prose-code:p-0 text-[12px] md:text-sm">
+                  <div className="prose prose-invert prose-xs max-w-none prose-p:leading-relaxed prose-code:text-accent prose-code:bg-transparent prose-code:p-0 text-[calc(12px*var(--fs))] md:text-sm">
                     <Markdown 
                       remarkPlugins={[remarkMath]} 
                       rehypePlugins={[rehypeKatex]}
@@ -762,8 +760,8 @@ export default function App() {
                 {/* Hints / Solution UI */}
                 {msg.data && msg.data.isRelevant && !msg.isFollowUp && (
                   <div className="pl-3 md:pl-6 mt-4 space-y-6">
-                    <div className="flex items-center gap-2 text-[9px] md:text-[10px] font-bold text-[#00ff41]/40 uppercase tracking-widest border-t border-zinc-900 pt-4">
-                       &gt;&gt; LEARNING_PATH
+                    <div className="flex items-center gap-2 text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-accent/40 uppercase tracking-widest border-t border-zinc-900 pt-4">
+                       Hints
                     </div>
                     
                     <div className="space-y-4">
@@ -774,8 +772,8 @@ export default function App() {
                           key={hIdx}
                           className="flex gap-2 md:gap-4 items-start"
                         >
-                          <span className="text-[#00ff41]/30 shrink-0 select-none text-[10px] md:text-sm">H0{hIdx + 1}:</span>
-                          <div className="flex-1 prose prose-invert prose-xs leading-relaxed text-zinc-400 text-[11px] md:text-sm">
+                          <span className="text-accent/30 shrink-0 select-none text-[calc(10px*var(--fs))] md:text-sm">H0{hIdx + 1}:</span>
+                          <div className="flex-1 prose prose-invert prose-xs leading-relaxed text-zinc-400 text-[calc(11px*var(--fs))] md:text-sm">
                             <Markdown 
                               remarkPlugins={[remarkMath]} 
                               rehypePlugins={[rehypeKatex]}
@@ -791,12 +789,12 @@ export default function App() {
                         <motion.div
                           initial={{ opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="mt-6 p-3 md:p-4 bg-[#00ff41]/5 border border-[#00ff41]/10 rounded-sm"
+                          className="mt-6 p-3 md:p-4 bg-accent/5 border border-accent/10 rounded-sm"
                         >
-                          <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41] uppercase tracking-widest flex items-center gap-2 mb-2">
-                            <MessageSquare className="w-3 h-3" /> THINK_ABOUT_THIS
+                          <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-accent uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <MessageSquare className="w-3 h-3" /> Think about this
                           </div>
-                          <p className="text-[11px] md:text-sm text-[#00ff41]/80 leading-relaxed italic">
+                          <p className="text-[calc(11px*var(--fs))] md:text-sm text-accent/80 leading-relaxed italic">
                             {msg.data.reflective_question}
                           </p>
                         </motion.div>
@@ -807,9 +805,9 @@ export default function App() {
                       {visibleHintsCount < msg.data.hints.length && (
                         <button
                           onClick={revealNextHint}
-                          className="text-[10px] md:text-[11px] font-bold text-[#00ff41] hover:underline uppercase tracking-widest text-left"
+                          className="text-[calc(10px*var(--fs))] md:text-[calc(11px*var(--fs))] font-bold text-accent hover:underline uppercase tracking-widest text-left"
                         >
-                          [ REVEAL_HINT ({visibleHintsCount}/{msg.data.hints.length}) ]
+                          [ Reveal hint ({visibleHintsCount} of {msg.data.hints.length}) ]
                         </button>
                       )}
 
@@ -818,11 +816,11 @@ export default function App() {
                           onClick={() => markAsSolved(msg.data!)}
                           disabled={isSolutionLoading}
                           className={cn(
-                            "text-[10px] md:text-[11px] font-bold text-amber-500 hover:underline uppercase tracking-widest text-left",
+                            "text-[calc(10px*var(--fs))] md:text-[calc(11px*var(--fs))] font-bold text-amber-500 hover:underline uppercase tracking-widest text-left",
                             isSolutionLoading && "opacity-50 cursor-wait"
                           )}
                         >
-                          {isSolutionLoading ? "[ SYSTEM: COMPILING_SOLUTION... ]" : "[ SHOW_SOLUTION ]"}
+                          {isSolutionLoading ? "[ Compiling… ]" : "[ Show solution ]"}
                         </button>
                       )}
                     </div>
@@ -832,23 +830,23 @@ export default function App() {
             ))}
 
             {isLoading && (
-              <div className="flex items-center gap-4 text-[#00ff41]/60 text-[10px] font-bold animate-pulse pl-2">
+              <div className="flex items-center gap-4 text-accent/60 text-[calc(10px*var(--fs))] font-bold animate-pulse pl-2">
                 <span>_</span>
-                <span>SYSTEM: THINKING...</span>
+                <span>Thinking…</span>
               </div>
             )}
           </div>
 
           {/* Prompt Area */}
-          <div className="mt-auto pt-4 md:pt-6 border-t border-[#333]/50">
+          <div className="mt-auto pt-4 md:pt-6 border-t border-line/50">
              <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
                {solved ? (
-                <div className="text-[9px] md:text-[10px] text-amber-500/60 uppercase tracking-widest italic">
-                  # Follow-up enabled. Ask questions about the implementation.
+                <div className="text-[calc(10px*var(--fs))] text-amber-500/70 italic">
+                  Solution unlocked — ask any follow-up question.
                 </div>
                ) : (
-                <div className="text-[9px] md:text-[10px] text-[#00ff41]/40 uppercase tracking-widest font-mono">
-                  # Default solutions: C, C++, Python. Mention a language (e.g., 'in Java') for specific output.
+                <div className="text-[calc(10px*var(--fs))] text-accent/50 font-mono">
+                  Enter to send · Shift+Enter for a new line
                 </div>
                )}
              </div>
@@ -857,7 +855,7 @@ export default function App() {
               onSubmit={handleSubmit}
               className="flex flex-col md:flex-row md:items-start gap-2 group"
             >
-              <div className="text-[#00ff41] shrink-0 md:py-1 text-[10px] md:text-sm font-bold opacity-60 md:opacity-100 flex items-center gap-2">
+              <div className="text-accent shrink-0 md:py-1 text-[calc(10px*var(--fs))] md:text-sm font-bold opacity-60 md:opacity-100 flex items-center gap-2">
                  <span>student@hintflow %</span>
               </div>
               <textarea
@@ -874,8 +872,8 @@ export default function App() {
                     handleSubmit(e);
                   }
                 }}
-                placeholder={solved ? "ASK_DESC..." : "INPUT_PROBLEM..."}
-                className="flex-1 bg-transparent border-none text-[#00ff41] placeholder:text-[#00ff41]/20 focus:outline-none resize-none overflow-hidden max-h-40 py-1 text-[13px] md:text-sm"
+                placeholder={solved ? "Ask a follow-up…" : "Paste a problem or your code…"}
+                className="flex-1 bg-transparent border-none text-accent placeholder:text-accent/20 focus:outline-none resize-none overflow-hidden max-h-40 py-1 text-[calc(13px*var(--fs))] md:text-sm"
                 disabled={isLoading}
                 autoFocus
               />
@@ -887,21 +885,21 @@ export default function App() {
       {/* Solution Modal (Terminal Styled) */}
       <AnimatePresence>
         {modalData && (
-          <div className="fixed inset-0 h-[100dvh] w-full z-50 flex items-center justify-center p-0 md:p-8 lg:p-16 bg-black/95 md:bg-black/90 backdrop-blur-sm uppercase-none">
+          <div className="fixed inset-0 h-[100dvh] w-full z-50 flex items-center justify-center p-0 md:p-8 lg:p-16 bg-onyx/95 md:bg-onyx/90 backdrop-blur-sm uppercase-none">
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="w-full h-full max-w-6xl md:rounded-lg bg-[#0c0c0c] border border-[#333]/50 md:border-[#333] flex flex-col shadow-2xl relative overflow-hidden"
+              className="w-full h-full max-w-6xl md:rounded-lg bg-surface border border-line/50 md:border-line flex flex-col shadow-2xl relative overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-[#1a1a1a] border-b border-[#333] shrink-0">
+              <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-chrome border-b border-line shrink-0">
                  <div className="flex items-center gap-2 md:gap-3">
-                    <span className="text-[#00ff41] font-bold text-[10px] md:text-xs tracking-widest italic truncate">_VIEW: SOLUTION.LOG</span>
+                    <span className="text-accent font-bold text-[calc(10px*var(--fs))] md:text-xs tracking-widest italic truncate">_VIEW: SOLUTION.LOG</span>
                  </div>
                  <button
                   onClick={() => setModalData(null)}
-                  className="text-zinc-600 hover:text-[#00ff41] transition-colors font-bold text-[10px] md:text-xs p-1"
+                  className="text-zinc-600 hover:text-accent transition-colors font-bold text-[calc(10px*var(--fs))] md:text-xs p-1"
                 >
                   [ CLOSE ]
                 </button>
@@ -909,11 +907,11 @@ export default function App() {
 
               {/* Modal Content */}
               <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-12 terminal-scroll">
-                <div className="bg-black/40 border border-[#222] rounded overflow-hidden">
+                <div className="bg-onyx/40 border border-line-soft rounded overflow-hidden">
                   {/* Editor Header */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between px-3 py-2 bg-[#111] border-b border-[#222] gap-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between px-3 py-2 bg-chrome border-b border-line-soft gap-3">
                     <div className="flex items-center gap-2 overflow-x-auto">
-                       <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-widest shrink-0 mr-2">
+                       <span className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] text-zinc-500 font-bold uppercase tracking-widest shrink-0 mr-2">
                         LANG:
                       </span>
                       {modalSolutions.map((sol, idx) => (
@@ -921,10 +919,10 @@ export default function App() {
                           key={idx}
                           onClick={() => setActiveSolutionLangIdx(idx)}
                           className={cn(
-                            "px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest transition-all border rounded-sm shrink-0",
+                            "px-2.5 py-0.5 text-[calc(9px*var(--fs))] font-bold uppercase tracking-widest transition-all border rounded-sm shrink-0",
                             activeSolutionLangIdx === idx
-                              ? "bg-[#00ff41] text-black border-[#00ff41]"
-                              : "text-zinc-400 border-zinc-800 hover:text-[#00ff41] hover:border-zinc-700"
+                              ? "bg-accent text-on-accent border-accent"
+                              : "text-zinc-400 border-zinc-800 hover:text-accent hover:border-zinc-700"
                           )}
                         >
                           {sol.language === 'cpp' ? 'C++' : sol.language}
@@ -935,7 +933,7 @@ export default function App() {
                     <div className="flex items-center justify-between md:justify-end gap-6 overflow-x-auto">
                       <button
                         onClick={() => handleCopy(cleanCode(activeSolutionCodeObj?.code || ''))}
-                        className="text-zinc-500 hover:text-[#00ff41] transition-colors shrink-0 flex items-center gap-1 text-[10px] font-bold"
+                        className="text-zinc-500 hover:text-accent transition-colors shrink-0 flex items-center gap-1 text-[calc(10px*var(--fs))] font-bold"
                         title="COPY"
                       >
                         {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -945,7 +943,7 @@ export default function App() {
                   </div>
 
                   {/* Editor Content */}
-                  <div className="text-[10px] md:text-xs overflow-x-auto">
+                  <div className="text-[calc(10px*var(--fs))] md:text-xs overflow-x-auto">
                     <SyntaxHighlighter
                       language={
                         activeSolutionCodeObj?.language?.toLowerCase() === 'cpp' || activeSolutionCodeObj?.language?.toLowerCase() === 'c' 
@@ -954,12 +952,11 @@ export default function App() {
                           ? 'python'
                           : activeSolutionCodeObj?.language?.toLowerCase() || 'text'
                       }
-                      style={vscDarkPlus}
+                      style={SYNTAX_THEMES[theme]}
                       showLineNumbers={true}
-                      lineNumberStyle={{ minWidth: '3em', paddingRight: '1rem', color: '#222', textAlign: 'right', userSelect: 'none' }}
+                      lineNumberStyle={{ minWidth: '3em', paddingRight: '1rem', color: LINE_NUMBER_COLORS[theme], textAlign: 'right', userSelect: 'none' }}
                       customStyle={{ 
                         margin: 0, 
-                        background: 'transparent',
                         padding: '1rem md:1.5rem',
                         lineHeight: '1.6',
                         fontFamily: '"Fira Code", monospace'
@@ -973,17 +970,17 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   {modalData.complexity && (
                     <div className="space-y-4">
-                      <div className="text-[9px] md:text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">
+                      <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-amber-500/60 uppercase tracking-widest">
                         COMPLEXITY_ANALYSIS
                       </div>
                       <div className="flex gap-4">
                         <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded">
-                           <p className="text-[8px] uppercase text-zinc-500 mb-1">Time</p>
-                           <code className="text-[#00ff41] font-bold text-sm tracking-widest">{modalData.complexity.time}</code>
+                           <p className="text-[calc(8px*var(--fs))] uppercase text-zinc-500 mb-1">Time</p>
+                           <code className="text-accent font-bold text-sm tracking-widest">{modalData.complexity.time}</code>
                         </div>
                         <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded">
-                           <p className="text-[8px] uppercase text-zinc-500 mb-1">Space</p>
-                           <code className="text-[#00ff41] font-bold text-sm tracking-widest">{modalData.complexity.space}</code>
+                           <p className="text-[calc(8px*var(--fs))] uppercase text-zinc-500 mb-1">Space</p>
+                           <code className="text-accent font-bold text-sm tracking-widest">{modalData.complexity.space}</code>
                         </div>
                       </div>
                     </div>
@@ -991,12 +988,12 @@ export default function App() {
 
                   {modalData.pitfalls && modalData.pitfalls.length > 0 && (
                     <div className="space-y-4">
-                      <div className="text-[9px] md:text-[10px] font-bold text-red-500/60 uppercase tracking-widest">
+                      <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-red-500/60 uppercase tracking-widest">
                         COMMON_PITFALLS
                       </div>
                       <div className="space-y-2">
                         {modalData.pitfalls.map((pitfall, pIdx) => (
-                          <div key={pIdx} className="flex gap-2 text-[11px] md:text-sm text-zinc-400 italic">
+                          <div key={pIdx} className="flex gap-2 text-[calc(11px*var(--fs))] md:text-sm text-zinc-400 italic">
                              <span className="text-red-500/40">!</span>
                              <p>{pitfall}</p>
                           </div>
@@ -1007,10 +1004,10 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4 md:space-y-6">
-                  <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41]/60 uppercase tracking-widest">
+                  <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-accent/60 uppercase tracking-widest">
                      HOW_IT_WORKS.MD
                   </div>
-                  <div className="prose prose-invert prose-xs max-w-none text-zinc-400 text-[11px] md:text-sm">
+                  <div className="prose prose-invert prose-xs max-w-none text-zinc-400 text-[calc(11px*var(--fs))] md:text-sm">
                     <Markdown 
                       remarkPlugins={[remarkMath]} 
                       rehypePlugins={[rehypeKatex]}
@@ -1022,23 +1019,23 @@ export default function App() {
                 </div>
 
                 {modalData.resources && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8 border-t border-[#222]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-8 border-t border-line-soft">
                     <div className="space-y-4 md:space-y-6">
-                      <div className="text-[9px] md:text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">
+                      <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-amber-500/60 uppercase tracking-widest">
                         RESOURCES:BOOKS
                       </div>
                       <div className="space-y-3">
                         {modalData.resources.books.slice(0, 3).map((book, bIdx) => (
                           <div key={bIdx} className="space-y-1">
-                            <p className="text-[11px] md:text-xs font-bold text-zinc-300">{book.title}</p>
-                            <p className="text-[10px] text-zinc-600">— {book.author}</p>
+                            <p className="text-[calc(11px*var(--fs))] md:text-xs font-bold text-zinc-300">{book.title}</p>
+                            <p className="text-[calc(10px*var(--fs))] text-zinc-600">— {book.author}</p>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div className="space-y-4 md:space-y-6">
-                      <div className="text-[9px] md:text-[10px] font-bold text-[#00ff41]/60 uppercase tracking-widest">
+                      <div className="text-[calc(9px*var(--fs))] md:text-[calc(10px*var(--fs))] font-bold text-accent/60 uppercase tracking-widest">
                         RESOURCES:WEB
                       </div>
                       <div className="space-y-3 md:space-y-4">
@@ -1050,8 +1047,8 @@ export default function App() {
                             rel="noopener noreferrer"
                             className="block group"
                           >
-                            <p className="text-[11px] md:text-xs text-zinc-400 group-hover:text-[#00ff41] transition-colors truncate">{res.name}</p>
-                            <p className="text-[9px] text-zinc-700 truncate">{res.url}</p>
+                            <p className="text-[calc(11px*var(--fs))] md:text-xs text-zinc-400 group-hover:text-accent transition-colors truncate">{res.name}</p>
+                            <p className="text-[calc(9px*var(--fs))] text-zinc-700 truncate">{res.url}</p>
                           </a>
                         ))}
                       </div>
